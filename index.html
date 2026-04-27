@@ -1229,7 +1229,7 @@ function renderKPI() {
     })
     .filter(x => x !== null);
   const avgLead = leadTimes.length ? leadTimes.reduce((a,b)=>a+b,0)/leadTimes.length : 0;
-  const slaOk = leadTimes.filter(d => d * 24 <= SLA_HOURS).length;
+  const slaOk = leadTimes.filter(d => d <= SLA_DAYS).length;
   const slaPct = leadTimes.length ? (slaOk/leadTimes.length*100) : 0;
 
   // 재발 수리율: 같은 시리얼 2번 이상
