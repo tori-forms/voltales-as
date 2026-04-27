@@ -854,14 +854,14 @@ table.data tr:hover td{background:#fafbfc}
         </div>
         <div class="grid-3">
           <div class="cost-box">
-            <div class="icon-line">논배터리 AS 비용</div>
-            <div class="v" id="cost-as">—</div>
-            <div class="sub" id="cost-as-sub">—</div>
-          </div>
-          <div class="cost-box">
             <div class="icon-line">새제품 구입 시</div>
             <div class="v" id="cost-new">—</div>
             <div class="sub" id="cost-new-sub">—</div>
+          </div>
+          <div class="cost-box">
+            <div class="icon-line">논배터리 AS 비용</div>
+            <div class="v" id="cost-as">—</div>
+            <div class="sub" id="cost-as-sub">—</div>
           </div>
           <div class="cost-box highlight">
             <div class="icon-line">절감액</div>
@@ -874,13 +874,13 @@ table.data tr:hover td{background:#fafbfc}
       <div class="card" style="margin-bottom:14px">
         <div class="card-title">
           업체별 수리비 비교
-          <span class="right">PCB 교체·LCD 교체·M/B 수리만 집계 · 논배터리 제외 · <span id="ven-count">0</span>건 기준</span>
+          <span class="right">PCB 교체·LCD 교체·MB수리만 집계 · 논배터리 제외 · <span id="ven-count">0</span>건 기준</span>
         </div>
         <div class="grid-3">
           <div class="cost-box">
             <div class="icon-line">📋 태블라스트 예상</div>
             <div class="v" id="ven-est">—</div>
-            <div class="sub">PCB 72,000 / LCD 65,000 / M/B 23,000</div>
+            <div class="sub">PCB 72,000 / LCD 65,000 / MB 23,000</div>
           </div>
           <div class="cost-box">
             <div class="icon-line">👤 폼즈 실제 비용</div>
@@ -933,7 +933,7 @@ const DEMO_MODE = APPS_SCRIPT_URL.startsWith('__');
 
 /* 부품 단가 (업체 비교용) - 토리님이 제공한 시안 그대로 */
 const VENDOR_PRICE = {
-  '태블라스트': { 'PCB 교체':72000, 'LCD 교체':65000, 'M/B 수리':23000, 'MB수리':23000 },
+  '태블라스트': { 'PCB 교체':72000, 'LCD 교체':65000, 'MB수리':23000 },
 };
 /* 새제품 단가 */
 const NEW_UNIT_PRICE = 140000;
@@ -1360,7 +1360,8 @@ function renderMonthly() {
   state.filtered.forEach(e => {
     const ym = fmt.ym(e.date);
     if(!buckets[ym]) buckets[ym] = { sum:0, cnt:0 };
-    buckets[ym].sum += Number(e.total||0);
+    // 매출 = 공임비 + 부품비 (KPI '총 매출액'과 동일 정의)
+    buckets[ym].sum += Number(e.total||0) + partsCost(e);
     buckets[ym].cnt += 1;
   });
   const months = Object.keys(buckets).sort().slice(-6);
@@ -1427,13 +1428,13 @@ function renderYYMM() {
 
 /* 비용 구조 분석 (공임비 vs 부품비) */
 function renderCostStruct() {
-  let totalRevenue = 0, totalParts = 0;
+  let totalLabor = 0, totalParts = 0;
   state.filtered.forEach(e => {
-    totalRevenue += Number(e.total||0);
-    totalParts += partsCost(e);
+    totalLabor += Number(e.total||0);    // 공임비
+    totalParts += partsCost(e);           // 부품비
   });
-  const labor = Math.max(0, totalRevenue - totalParts);
-  const totalMan = Math.round(totalRevenue/10000);
+  const grandTotal = totalLabor + totalParts;
+  const totalMan = Math.round(grandTotal/10000);
   document.getElementById('cost-struct-total').textContent = fmt.num(totalMan)+'만원';
 
   destroyChart('cost-struct');
@@ -1441,7 +1442,7 @@ function renderCostStruct() {
     type:'doughnut',
     data:{
       labels:['공임비','부품비'],
-      datasets:[{ data:[labor, totalParts], backgroundColor:['#a855f7','#fb923c'], borderWidth:0 }],
+      datasets:[{ data:[totalLabor, totalParts], backgroundColor:['#a855f7','#fb923c'], borderWidth:0 }],
     },
     options:{
       responsive:true, maintainAspectRatio:false,
@@ -1454,14 +1455,14 @@ function renderCostStruct() {
     <div class="dist-row">
       <div class="dist-dot" style="background:#a855f7"></div>
       <div class="dist-name">공임비</div>
-      <div class="dist-val">${fmt.num(Math.round(labor/10000))}만원</div>
-      <div class="dist-pct">${fmt.pct(labor, totalRevenue)}</div>
+      <div class="dist-val">${fmt.num(Math.round(totalLabor/10000))}만원</div>
+      <div class="dist-pct">${fmt.pct(totalLabor, grandTotal)}</div>
     </div>
     <div class="dist-row">
       <div class="dist-dot" style="background:#fb923c"></div>
       <div class="dist-name">부품비</div>
       <div class="dist-val">${fmt.num(Math.round(totalParts/10000))}만원</div>
-      <div class="dist-pct">${fmt.pct(totalParts, totalRevenue)}</div>
+      <div class="dist-pct">${fmt.pct(totalParts, grandTotal)}</div>
     </div>
   `;
 }
@@ -1815,13 +1816,13 @@ function renderCost() {
   document.getElementById('ven-save-pct').textContent = venCount > 0 ? `${venSavePct.toFixed(0)}% 저렴 · 건당 ${fmt.num(Math.round(venSave/Math.max(venCount,1)))}원 절감` : '데이터 없음';
 
   // 항목별 차트 (PCB / LCD / MB 각각의 평균 단가)
-  const buckets = { 'PCB 교체':{e:0,a:0,c:0}, 'LCD 교체':{e:0,a:0,c:0}, 'M/B 수리':{e:0,a:0,c:0} };
+  const buckets = { 'PCB 교체':{e:0,a:0,c:0}, 'LCD 교체':{e:0,a:0,c:0}, 'MB수리':{e:0,a:0,c:0} };
   data.forEach(e => {
     const ws = new Set(e.works||[]);
     const mp = modelPartsAll[e.model] || {};
     if(ws.has('pcb'))   { buckets['PCB 교체'].e += TAECLAST.pcb;   buckets['PCB 교체'].a += FORMS_LABOR.pcb   + (Number(mp.pcb)||0);   buckets['PCB 교체'].c++; }
     if(ws.has('panel')) { buckets['LCD 교체'].e += TAECLAST.panel; buckets['LCD 교체'].a += FORMS_LABOR.panel + (Number(mp.panel)||0); buckets['LCD 교체'].c++; }
-    if(ws.has('board')) { buckets['M/B 수리'].e += TAECLAST.board; buckets['M/B 수리'].a += FORMS_LABOR.board + (Number(mp.board)||0); buckets['M/B 수리'].c++; }
+    if(ws.has('board')) { buckets['MB수리'].e += TAECLAST.board; buckets['MB수리'].a += FORMS_LABOR.board + (Number(mp.board)||0); buckets['MB수리'].c++; }
   });
   const labels = Object.keys(buckets);
   const estData = labels.map(k => buckets[k].c > 0 ? Math.round(buckets[k].e/buckets[k].c) : 0);
