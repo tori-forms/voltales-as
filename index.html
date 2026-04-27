@@ -1,0 +1,2098 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1280">
+<title>볼타레스 AS — AS 현황 대시보드</title>
+
+<!-- Pretendard 폰트 -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" rel="stylesheet">
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+<style>
+:root{
+  --sidebar-bg:#1e293b;
+  --sidebar-text:#cbd5e1;
+  --sidebar-text-muted:#94a3b8;
+  --sidebar-active:#3b82f6;
+  --sidebar-hover:#334155;
+  --sidebar-border:rgba(255,255,255,.06);
+
+  --bg:#f1f5f9;
+  --surface:#ffffff;
+  --border:#e2e8f0;
+  --border-strong:#cbd5e1;
+  --text:#0f172a;
+  --text-2:#475569;
+  --text-3:#94a3b8;
+
+  --primary:#3b82f6;
+  --primary-2:#2563eb;
+  --primary-soft:#dbeafe;
+
+  --c-blue:#3b82f6;
+  --c-emerald:#10b981;
+  --c-amber:#f59e0b;
+  --c-purple:#a855f7;
+  --c-rose:#f43f5e;
+  --c-cyan:#06b6d4;
+  --c-slate:#64748b;
+
+  --shadow-sm:0 1px 2px 0 rgb(0 0 0 / .04), 0 1px 1px 0 rgb(0 0 0 / .03);
+  --shadow:0 1px 3px 0 rgb(0 0 0 / .06), 0 1px 2px -1px rgb(0 0 0 / .05);
+  --shadow-md:0 4px 6px -1px rgb(0 0 0 / .07), 0 2px 4px -2px rgb(0 0 0 / .05);
+
+  --radius:12px;
+  --radius-sm:8px;
+  --radius-lg:16px;
+}
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  font-family:'Pretendard Variable','Pretendard',-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo','Noto Sans KR',sans-serif;
+  font-feature-settings:'tnum';
+  background:var(--bg);
+  color:var(--text);
+  font-size:14px;
+  line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+}
+button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit}
+input,select{font-family:inherit;font-size:inherit;color:inherit}
+a{color:inherit;text-decoration:none}
+
+/* ─────────────── Layout ─────────────── */
+.layout{display:grid;grid-template-columns:220px 1fr;min-height:100vh}
+
+/* ─────────────── Sidebar ─────────────── */
+.sidebar{
+  background:var(--sidebar-bg);
+  color:var(--sidebar-text);
+  display:flex;flex-direction:column;
+  position:sticky;top:0;height:100vh;
+  padding:0;
+  border-right:1px solid var(--sidebar-border);
+}
+.sb-logo{
+  display:flex;align-items:center;gap:10px;
+  padding:18px 20px;
+  font-size:16px;font-weight:700;color:#fff;
+  letter-spacing:-.01em;
+  border-bottom:1px solid var(--sidebar-border);
+}
+.sb-logo .bolt{color:#fbbf24;font-size:18px}
+.sb-nav{padding:14px 10px;display:flex;flex-direction:column;gap:2px;flex:1}
+.sb-item{
+  display:flex;align-items:center;gap:10px;
+  padding:10px 12px;border-radius:8px;
+  color:var(--sidebar-text-muted);
+  font-size:13.5px;font-weight:500;
+  transition:background .15s,color .15s;
+  position:relative;
+}
+.sb-item:hover{background:var(--sidebar-hover);color:#fff}
+.sb-item.active{
+  background:var(--sidebar-active);
+  color:#fff;font-weight:600;
+  box-shadow:0 1px 2px rgba(59,130,246,.4);
+}
+.sb-item .ico{width:16px;height:16px;flex-shrink:0;opacity:.9}
+.sb-item .badge{
+  margin-left:auto;
+  background:var(--c-rose);color:#fff;
+  font-size:10.5px;font-weight:700;
+  width:18px;height:18px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+}
+.sb-foot{
+  padding:14px 16px;
+  border-top:1px solid var(--sidebar-border);
+}
+.sb-theme{
+  display:flex;align-items:center;gap:8px;
+  padding:8px 12px;border-radius:8px;
+  background:rgba(255,255,255,.04);
+  color:var(--sidebar-text);
+  font-size:13px;font-weight:500;
+  width:100%;
+  transition:background .15s;
+}
+.sb-theme:hover{background:rgba(255,255,255,.08)}
+
+/* ─────────────── Main ─────────────── */
+.main{padding:18px 24px 40px;min-width:0}
+
+/* Header */
+.header{
+  display:flex;align-items:flex-start;justify-content:space-between;
+  margin-bottom:16px;gap:24px;
+}
+.header h1{
+  font-size:20px;font-weight:700;letter-spacing:-.015em;color:var(--text);
+  line-height:1.3;
+}
+.header .subtitle{font-size:12.5px;color:var(--text-3);margin-top:2px}
+.header-actions{display:flex;align-items:center;gap:12px}
+.update-info{
+  display:flex;align-items:center;gap:6px;
+  font-size:12px;color:var(--text-3);
+}
+.update-info .dot{width:6px;height:6px;border-radius:50%;background:var(--c-emerald)}
+.btn-export{
+  background:var(--c-emerald);color:#fff;font-weight:600;font-size:13px;
+  padding:8px 14px;border-radius:8px;
+  display:flex;align-items:center;gap:6px;
+  box-shadow:var(--shadow-sm);
+  transition:filter .15s,transform .1s;
+}
+.btn-export:hover{filter:brightness(1.05)}
+.btn-export:active{transform:translateY(1px)}
+
+/* Filter bar */
+.filter-bar{
+  display:flex;align-items:center;flex-wrap:wrap;gap:8px;
+  margin-bottom:14px;
+  position:relative;
+}
+.chip{
+  background:#fff;color:var(--text-2);
+  font-size:12.5px;font-weight:500;
+  padding:7px 14px;border-radius:9999px;
+  border:1px solid var(--border);
+  transition:background .12s,color .12s,border-color .12s;
+}
+.chip:hover{border-color:var(--border-strong)}
+.chip.active{background:var(--primary);color:#fff;border-color:var(--primary);font-weight:600}
+.filter-group{
+  display:flex;align-items:center;gap:6px;
+  background:#fff;border:1px solid var(--border);
+  border-radius:8px;padding:5px 10px;
+  font-size:12.5px;color:var(--text-2);
+}
+.filter-group .ico{width:14px;height:14px;color:var(--text-3)}
+.filter-group input[type="date"],
+.filter-group select,
+.filter-group input[type="text"]{
+  border:0;outline:0;background:transparent;
+  font-size:12.5px;color:var(--text);
+  min-width:auto;
+}
+.filter-group input[type="date"]{font-family:inherit}
+.filter-group input[type="text"]{width:160px}
+.filter-group .sep{color:var(--text-3);padding:0 2px}
+.btn-search{
+  background:var(--primary);color:#fff;font-weight:600;font-size:12.5px;
+  padding:7px 14px;border-radius:8px;
+  display:flex;align-items:center;gap:5px;
+  margin-left:auto;
+  transition:background .12s;
+}
+.btn-search:hover{background:var(--primary-2)}
+.btn-reset{
+  background:#fff;color:var(--text-2);font-weight:500;font-size:12.5px;
+  padding:7px 12px;border-radius:8px;
+  border:1px solid var(--border);
+  display:flex;align-items:center;gap:5px;
+  transition:background .12s;
+}
+.btn-reset:hover{background:#f8fafc}
+.filter-actions{display:flex;flex-direction:column;gap:6px;margin-left:auto;align-items:flex-end}
+
+/* Tabs */
+.tabs{
+  display:flex;gap:4px;
+  border-bottom:1px solid var(--border);
+  margin-bottom:18px;
+  padding-bottom:0;
+}
+.tab{
+  padding:10px 14px 11px;
+  font-size:13.5px;font-weight:500;
+  color:var(--text-2);
+  display:flex;align-items:center;gap:6px;
+  border-bottom:2px solid transparent;
+  transition:color .12s,border-color .12s;
+  margin-bottom:-1px;
+}
+.tab:hover{color:var(--text)}
+.tab.active{color:var(--primary);border-bottom-color:var(--primary);font-weight:600}
+.tab .badge{
+  background:var(--c-rose);color:#fff;
+  font-size:10.5px;font-weight:700;
+  width:18px;height:18px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+}
+.tab .ico{width:14px;height:14px;opacity:.85}
+
+/* Tab content */
+.tab-pane{display:none}
+.tab-pane.active{display:block;animation:fadeIn .25s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+
+/* ─────────────── Cards ─────────────── */
+.card{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius);padding:16px 18px;
+  box-shadow:var(--shadow-sm);
+}
+.card-title{
+  font-size:13.5px;font-weight:700;color:var(--text);
+  display:flex;align-items:center;gap:6px;
+  margin-bottom:14px;
+}
+.card-title .ico{width:16px;height:16px}
+.card-title .right{margin-left:auto;font-size:12px;font-weight:500;color:var(--text-3)}
+
+/* KPI cards */
+.kpi-grid{
+  display:grid;
+  grid-template-columns:repeat(6,1fr);
+  gap:12px;
+  margin-bottom:14px;
+}
+.kpi{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius);padding:14px 16px;
+  display:flex;align-items:flex-start;gap:12px;
+  box-shadow:var(--shadow-sm);
+  transition:box-shadow .15s,transform .15s;
+}
+.kpi:hover{box-shadow:var(--shadow-md);transform:translateY(-1px)}
+.kpi-icon{
+  width:38px;height:38px;border-radius:10px;
+  display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;
+}
+.kpi-icon svg{width:18px;height:18px}
+.kpi-icon.blue{background:rgba(59,130,246,.1);color:var(--c-blue)}
+.kpi-icon.green{background:rgba(16,185,129,.1);color:var(--c-emerald)}
+.kpi-icon.amber{background:rgba(245,158,11,.1);color:var(--c-amber)}
+.kpi-icon.purple{background:rgba(168,85,247,.1);color:var(--c-purple)}
+.kpi-icon.cyan{background:rgba(6,182,212,.1);color:var(--c-cyan)}
+.kpi-icon.rose{background:rgba(244,63,94,.1);color:var(--c-rose)}
+.kpi-icon.slate{background:rgba(100,116,139,.1);color:var(--c-slate)}
+.kpi-body{flex:1;min-width:0}
+.kpi-label{font-size:12px;color:var(--text-3);margin-bottom:4px;font-weight:500}
+.kpi-value{
+  font-size:22px;font-weight:700;color:var(--text);
+  letter-spacing:-.02em;line-height:1.1;
+  display:flex;align-items:baseline;gap:2px;
+}
+.kpi-value .unit{font-size:13px;font-weight:600;color:var(--text-2);margin-left:2px}
+.kpi-foot{font-size:11.5px;color:var(--text-3);margin-top:6px;font-weight:500}
+.kpi-foot .up{color:var(--c-emerald)}
+.kpi-foot .down{color:var(--c-rose)}
+
+/* Two-column grid */
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+.grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:14px}
+.grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px}
+
+/* Charts */
+.chart-wrap{position:relative;height:300px}
+.chart-wrap.tall{height:340px}
+.chart-wrap.short{height:240px}
+
+/* Donut center */
+.donut-wrap{position:relative}
+.donut-center{
+  position:absolute;inset:0;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  pointer-events:none;
+}
+.donut-center .v{font-size:22px;font-weight:700;color:var(--text);letter-spacing:-.02em}
+.donut-center .l{font-size:11.5px;color:var(--text-3);margin-top:2px}
+
+/* Distribution legend */
+.dist-legend{display:flex;flex-direction:column;gap:8px;padding:8px 0}
+.dist-row{
+  display:flex;align-items:center;gap:8px;
+  padding:6px 0;
+  font-size:13px;
+}
+.dist-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.dist-name{color:var(--text-2);flex:1;font-weight:500}
+.dist-val{font-weight:700;color:var(--text);font-variant-numeric:tabular-nums}
+.dist-pct{color:var(--text-3);font-size:11.5px;margin-left:6px;min-width:32px;text-align:right}
+
+.dist-card{display:grid;grid-template-columns:240px 1fr;gap:8px;align-items:center}
+.dist-card .chart-wrap{height:240px}
+
+/* Table */
+.table-wrap{overflow-x:auto;margin:0 -2px}
+table.data{width:100%;border-collapse:collapse;font-size:13px}
+table.data th{
+  text-align:left;font-weight:600;color:var(--text-3);
+  font-size:12px;
+  padding:10px 12px;border-bottom:1px solid var(--border);
+  background:#f8fafc;
+  white-space:nowrap;
+}
+table.data td{
+  padding:11px 12px;
+  border-bottom:1px solid #f1f5f9;
+  color:var(--text);
+  vertical-align:middle;
+}
+table.data tr:hover td{background:#fafbfc}
+.tag{
+  display:inline-block;
+  padding:3px 9px;border-radius:9999px;
+  font-size:11.5px;font-weight:600;
+  white-space:nowrap;
+}
+.tag.done{background:#dbeafe;color:#1d4ed8}
+.tag.wait{background:#fef3c7;color:#b45309}
+.tag.delay{background:#fee2e2;color:#b91c1c}
+
+/* Heatmap */
+.heatmap{
+  display:grid;
+  grid-template-columns:auto repeat(4,1fr);
+  gap:4px;
+  font-size:11.5px;
+}
+.heatmap .h-head{color:var(--text-3);text-align:center;padding:2px 0;font-weight:600}
+.heatmap .h-row-label{color:var(--text-3);font-weight:600;display:flex;align-items:center;justify-content:center;padding:0 6px}
+.heatmap .h-cell{
+  aspect-ratio:1.6/1;
+  border-radius:6px;
+  display:flex;align-items:center;justify-content:center;
+  font-weight:700;color:#1d4ed8;font-size:12px;
+}
+
+/* Cost compare boxes */
+.cost-box{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius);padding:18px 20px;
+  text-align:center;
+  position:relative;
+}
+.cost-box .icon-line{
+  display:flex;align-items:center;justify-content:center;gap:6px;
+  font-size:13px;color:var(--text-2);font-weight:600;
+  margin-bottom:8px;
+}
+.cost-box .v{
+  font-size:28px;font-weight:700;color:var(--text);
+  letter-spacing:-.02em;line-height:1.1;
+}
+.cost-box .v .unit{font-size:14px;font-weight:600;color:var(--text-2);margin-left:2px}
+.cost-box .sub{font-size:11.5px;color:var(--text-3);margin-top:6px}
+.cost-box.highlight{
+  background:#ecfdf5;
+  border:1.5px solid #6ee7b7;
+}
+.cost-box.highlight .v{color:#047857}
+.cost-box .pct-pill{
+  display:inline-block;margin-top:8px;
+  background:#6ee7b7;color:#065f46;
+  font-size:11.5px;font-weight:700;
+  padding:2px 8px;border-radius:9999px;
+}
+
+/* Alert items */
+.alert-list{display:flex;flex-direction:column;gap:10px}
+.alert-item{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius);
+  padding:14px 16px;
+  display:flex;align-items:flex-start;gap:12px;
+  position:relative;
+  border-left:4px solid var(--c-slate);
+}
+.alert-item.urgent{border-left-color:var(--c-rose)}
+.alert-item.warn{border-left-color:var(--c-amber)}
+.alert-item.info{border-left-color:var(--c-blue)}
+.alert-item.ok{border-left-color:var(--c-emerald)}
+.alert-icon{
+  width:32px;height:32px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;color:#fff;
+}
+.alert-item.urgent .alert-icon{background:var(--c-rose)}
+.alert-item.warn .alert-icon{background:var(--c-amber)}
+.alert-item.info .alert-icon{background:var(--c-blue)}
+.alert-item.ok .alert-icon{background:var(--c-emerald)}
+.alert-icon svg{width:16px;height:16px}
+.alert-body{flex:1;min-width:0}
+.alert-title{font-size:14px;font-weight:700;color:var(--text);margin-bottom:3px}
+.alert-msg{font-size:12.5px;color:var(--text-2);line-height:1.5}
+.alert-time{font-size:11.5px;color:var(--text-3);margin-top:6px;display:flex;align-items:center;gap:4px}
+.alert-tag{
+  position:absolute;top:12px;right:14px;
+  font-size:10.5px;font-weight:700;
+  padding:2px 8px;border-radius:9999px;
+}
+.alert-item.urgent .alert-tag{background:#fee2e2;color:#b91c1c}
+.alert-item.warn .alert-tag{background:#fef3c7;color:#b45309}
+.alert-item.info .alert-tag{background:#dbeafe;color:#1d4ed8}
+.alert-item.ok .alert-tag{background:#d1fae5;color:#047857}
+
+/* Engineer cards */
+.eng-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
+.eng-card{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius);padding:14px 16px;
+}
+.eng-head{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.eng-avatar{
+  width:36px;height:36px;border-radius:50%;
+  background:linear-gradient(135deg,#60a5fa,#3b82f6);
+  color:#fff;font-weight:700;font-size:14px;
+  display:flex;align-items:center;justify-content:center;
+  letter-spacing:-.02em;
+}
+.eng-name{font-size:14px;font-weight:700;color:var(--text)}
+.eng-role{font-size:11.5px;color:var(--text-3)}
+.eng-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px;text-align:center}
+.eng-stats .s-l{font-size:10.5px;color:var(--text-3);font-weight:500}
+.eng-stats .s-v{font-size:14px;font-weight:700;color:var(--text);margin-top:2px}
+.eng-bar{height:6px;background:#f1f5f9;border-radius:9999px;overflow:hidden}
+.eng-bar-fill{height:100%;background:linear-gradient(90deg,#60a5fa,#3b82f6);border-radius:9999px;transition:width .4s}
+
+/* Mini bar */
+.mini-bar{
+  display:flex;align-items:center;gap:8px;
+  padding:6px 0;
+}
+.mini-bar .lbl{font-size:12.5px;color:var(--text-2);width:90px;flex-shrink:0;font-weight:500}
+.mini-bar .track{flex:1;height:8px;background:#f1f5f9;border-radius:9999px;overflow:hidden}
+.mini-bar .fill{height:100%;border-radius:9999px;transition:width .4s}
+.mini-bar .v{font-size:12px;color:var(--text);font-weight:700;width:48px;text-align:right;font-variant-numeric:tabular-nums}
+
+/* Loading */
+.loading{
+  display:flex;align-items:center;justify-content:center;
+  padding:60px 20px;color:var(--text-3);font-size:13px;gap:8px;
+}
+.spinner{
+  width:18px;height:18px;border:2px solid var(--border);border-top-color:var(--primary);
+  border-radius:50%;animation:spin .8s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* Toast */
+.toast{
+  position:fixed;bottom:20px;right:20px;
+  background:#0f172a;color:#fff;
+  padding:10px 16px;border-radius:8px;
+  font-size:13px;font-weight:500;
+  box-shadow:0 10px 30px rgba(0,0,0,.2);
+  z-index:1000;
+  opacity:0;transform:translateY(8px);transition:.25s;
+}
+.toast.show{opacity:1;transform:translateY(0)}
+.toast.error{background:#dc2626}
+
+/* Empty state */
+.empty{
+  text-align:center;padding:40px 20px;color:var(--text-3);
+  font-size:13px;
+}
+
+/* Top 5 list */
+.top-list{display:flex;flex-direction:column;gap:6px}
+.top-row{
+  display:flex;align-items:center;gap:10px;
+  padding:8px 4px;border-bottom:1px solid #f1f5f9;
+}
+.top-row:last-child{border-bottom:0}
+.top-rank{
+  width:22px;height:22px;border-radius:6px;
+  background:#f1f5f9;color:var(--text-2);
+  display:flex;align-items:center;justify-content:center;
+  font-size:11.5px;font-weight:700;
+}
+.top-row:nth-child(1) .top-rank{background:#fef3c7;color:#b45309}
+.top-row:nth-child(2) .top-rank{background:#e2e8f0;color:#475569}
+.top-row:nth-child(3) .top-rank{background:#fed7aa;color:#9a3412}
+.top-name{flex:1;font-size:13px;color:var(--text);font-weight:500}
+.top-val{font-size:12.5px;color:var(--text-3);font-variant-numeric:tabular-nums;font-weight:600}
+
+/* Responsive (compact) */
+@media (max-width:1280px){
+  .kpi-grid{grid-template-columns:repeat(3,1fr)}
+  .filter-group input[type="text"]{width:120px}
+}
+</style>
+</head>
+<body>
+
+<div class="layout">
+
+  <!-- ═════════════ Sidebar ═════════════ -->
+  <aside class="sidebar">
+    <div class="sb-logo">
+      <span class="bolt">⚡</span>
+      <span>볼타레스 AS</span>
+    </div>
+    <nav class="sb-nav">
+      <button class="sb-item active" data-tab="dashboard">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 13h8V3H3v10Zm10 8h8V11h-8v10ZM3 21h8v-6H3v6Zm10-18v6h8V3h-8Z"/></svg>
+        <span>대시보드</span>
+      </button>
+      <button class="sb-item" data-tab="analysis">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
+        <span>수리 분석</span>
+      </button>
+      <button class="sb-item" data-tab="shipping">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"/><path d="M15 18H9"/><path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.624l-3.48-4.35A1 1 0 0 0 17.52 8H14"/><circle cx="17" cy="18" r="2"/><circle cx="7" cy="18" r="2"/></svg>
+        <span>출고 목록</span>
+      </button>
+      <button class="sb-item" data-tab="cost">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+        <span>비용 비교</span>
+      </button>
+      <button class="sb-item" data-tab="alerts">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+        <span>알림 센터</span>
+        <span class="badge" id="sb-alert-badge">3</span>
+      </button>
+    </nav>
+    <div class="sb-foot">
+      <button class="sb-theme" id="theme-toggle">
+        <svg class="ico" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+        <span>라이트 모드</span>
+      </button>
+    </div>
+  </aside>
+
+  <!-- ═════════════ Main ═════════════ -->
+  <main class="main">
+
+    <!-- Header -->
+    <header class="header">
+      <div>
+        <h1>AS 현황 대시보드</h1>
+        <div class="subtitle">논배터리 태블릿 재작업 관리 시스템</div>
+      </div>
+      <div class="header-actions">
+        <div class="update-info">
+          <span class="dot"></span>
+          <span>최근 업데이트: <span id="last-update">—</span></span>
+        </div>
+        <button class="btn-export" id="btn-export">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          엑셀 내보내기
+        </button>
+      </div>
+    </header>
+
+    <!-- Filter bar -->
+    <div class="filter-bar">
+      <button class="chip active" data-period="all">전체</button>
+      <button class="chip" data-period="thisMonth">이번 달</button>
+      <button class="chip" data-period="lastMonth">지난 달</button>
+      <button class="chip" data-period="Q1">Q1</button>
+      <button class="chip" data-period="Q2">Q2</button>
+
+      <div class="filter-group">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+        <span>기간</span>
+        <input type="date" id="f-date-from">
+        <span class="sep">~</span>
+        <input type="date" id="f-date-to">
+      </div>
+
+      <div class="filter-group">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="2" width="12" height="20" rx="2"/><circle cx="12" cy="18" r="0.5" fill="currentColor"/></svg>
+        <span>기종</span>
+        <button class="chip active" data-model="all" style="padding:3px 10px;font-size:12px">전체</button>
+        <button class="chip" data-model="S2PRO_N" style="padding:3px 10px;font-size:12px">S2PRO_N</button>
+        <button class="chip" data-model="S2_N" style="padding:3px 10px;font-size:12px">S2_N</button>
+      </div>
+
+      <div class="filter-group">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+        <span>제조년월</span>
+        <select id="f-yymm"><option value="all">전체</option></select>
+      </div>
+
+      <div class="filter-group">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        <span>수리유형</span>
+        <select id="f-worktype">
+          <option value="all">전체</option>
+          <option value="single">단일수리</option>
+          <option value="multi">복합수리</option>
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+        <input type="text" id="f-serial" placeholder="시리얼번호 일부 입력">
+      </div>
+
+      <div class="filter-actions">
+        <button class="btn-search" id="btn-search">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+          조회
+        </button>
+        <button class="btn-reset" id="btn-reset">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9"/><polyline points="3 4 3 9 8 9"/></svg>
+          초기화
+        </button>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab active" data-tab="dashboard">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 13h8V3H3v10Zm10 8h8V11h-8v10ZM3 21h8v-6H3v6Zm10-18v6h8V3h-8Z"/></svg>
+        대시보드
+      </button>
+      <button class="tab" data-tab="analysis">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
+        수리 분석
+      </button>
+      <button class="tab" data-tab="shipping">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"/><path d="M15 18H9"/><path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.624l-3.48-4.35A1 1 0 0 0 17.52 8H14"/><circle cx="17" cy="18" r="2"/><circle cx="7" cy="18" r="2"/></svg>
+        출고 목록
+      </button>
+      <button class="tab" data-tab="cost">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+        비용 비교
+      </button>
+      <button class="tab" data-tab="alerts">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+        알림 센터
+        <span class="badge" id="tab-alert-badge">3</span>
+      </button>
+    </div>
+
+    <!-- ─── Loading state ─── -->
+    <div id="loading" class="loading">
+      <div class="spinner"></div>
+      <span>데이터 불러오는 중...</span>
+    </div>
+
+    <!-- ════════ Tab: Dashboard ════════ -->
+    <div class="tab-pane active" id="pane-dashboard" hidden>
+      <!-- KPI Cards -->
+      <div class="kpi-grid" id="kpi-cards"></div>
+
+      <!-- Row 1: 도넛 + 월별 콤보 -->
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">
+            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 0 1 10 10H12V2Z" fill="currentColor"/></svg>
+            수리 항목 분포
+            <span class="right" id="dist-total">총 0건</span>
+          </div>
+          <div class="dist-card">
+            <div class="chart-wrap donut-wrap" style="height:240px">
+              <canvas id="chart-dist"></canvas>
+            </div>
+            <div class="dist-legend" id="dist-legend"></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">
+            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="m7 14 4-4 4 4 5-5"/></svg>
+            월별 매출 &amp; 건수 추이
+          </div>
+          <div class="chart-wrap"><canvas id="chart-monthly"></canvas></div>
+        </div>
+      </div>
+
+      <!-- Row 2: 제조년월별 + 비용 구조 -->
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">
+            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+            제조년월별 작업 추이
+          </div>
+          <div class="chart-wrap"><canvas id="chart-yymm"></canvas></div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">비용 구조 분석</div>
+          <div class="dist-card">
+            <div class="chart-wrap donut-wrap" style="height:240px">
+              <canvas id="chart-cost-struct"></canvas>
+              <div class="donut-center">
+                <div class="v" id="cost-struct-total">0만원</div>
+                <div class="l">총 비용</div>
+              </div>
+            </div>
+            <div class="dist-legend" id="cost-struct-legend"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Row 3: 복잡도 + Top 5 -->
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">
+            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+            수리 복잡도 분석
+          </div>
+          <div id="complexity-bars" style="padding:8px 0"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">
+            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2 4 22h16L12 2Z"/><line x1="12" y1="9" x2="12" y2="14"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            고장 원인 Top 5
+          </div>
+          <div class="top-list" id="top-causes"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════ Tab: Analysis ════════ -->
+    <div class="tab-pane" id="pane-analysis" hidden>
+      <div class="card" style="margin-bottom:14px">
+        <div class="card-title">
+          <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="15" y2="12"/><line x1="3" y1="18" x2="9" y2="18"/></svg>
+          분기별 물량 분포
+        </div>
+        <div class="chart-wrap" style="height:240px"><canvas id="chart-quarter"></canvas></div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">
+            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+            수리유형별 매출 비중
+          </div>
+          <div class="chart-wrap" style="height:280px"><canvas id="chart-worktype"></canvas></div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">
+            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            요일별 접수 히트맵
+          </div>
+          <div class="heatmap" id="heatmap-weekly"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">
+          <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m17 3 4 4-4 4"/><path d="M3 7h18"/><path d="m7 21-4-4 4-4"/><path d="M21 17H3"/></svg>
+          수리 항목별 평균 비용 비교
+        </div>
+        <div class="chart-wrap" style="height:300px"><canvas id="chart-avg-cost"></canvas></div>
+      </div>
+    </div>
+
+    <!-- ════════ Tab: Shipping ════════ -->
+    <div class="tab-pane" id="pane-shipping" hidden>
+      <div class="grid-4" id="ship-kpi"></div>
+      <div class="card">
+        <div class="card-title">
+          <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"/><circle cx="17" cy="18" r="2"/><circle cx="7" cy="18" r="2"/></svg>
+          출고 목록
+        </div>
+        <div class="table-wrap">
+          <table class="data" id="ship-table">
+            <thead>
+              <tr>
+                <th style="width:40px">No</th>
+                <th>시리얼번호</th>
+                <th>기종</th>
+                <th>수리항목</th>
+                <th>마감일</th>
+                <th>출고일</th>
+                <th>에이징</th>
+                <th>상태</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════ Tab: Cost ════════ -->
+    <div class="tab-pane" id="pane-cost" hidden>
+      <div class="card" style="margin-bottom:14px">
+        <div class="card-title">
+          <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          논배터리 AS 비용 vs 새제품 <span class="right">새제품 단가 140,000원 기준</span>
+        </div>
+        <div class="grid-3">
+          <div class="cost-box">
+            <div class="icon-line">논배터리 AS 비용</div>
+            <div class="v" id="cost-as">—</div>
+            <div class="sub" id="cost-as-sub">—</div>
+          </div>
+          <div class="cost-box">
+            <div class="icon-line">새제품 구입 시</div>
+            <div class="v" id="cost-new">—</div>
+            <div class="sub" id="cost-new-sub">—</div>
+          </div>
+          <div class="cost-box highlight">
+            <div class="icon-line">절감액</div>
+            <div class="v" id="cost-save">—</div>
+            <div class="pct-pill" id="cost-save-pct">— 절감</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom:14px">
+        <div class="card-title">
+          업체별 수리비 비교
+          <span class="right">PCB 교체·LCD 교체·M/B 수리만 집계 · 논배터리 제외 · <span id="ven-count">0</span>건 기준</span>
+        </div>
+        <div class="grid-3">
+          <div class="cost-box">
+            <div class="icon-line">📋 태블라스트 예상</div>
+            <div class="v" id="ven-est">—</div>
+            <div class="sub">PCB 72,000 / LCD 65,000 / M/B 23,000</div>
+          </div>
+          <div class="cost-box">
+            <div class="icon-line">👤 폼즈 실제 비용</div>
+            <div class="v" id="ven-actual">—</div>
+            <div class="sub" id="ven-actual-sub">—</div>
+          </div>
+          <div class="cost-box highlight">
+            <div class="icon-line">절감액</div>
+            <div class="v" id="ven-save">—</div>
+            <div class="pct-pill" id="ven-save-pct">— 절감</div>
+          </div>
+        </div>
+        <div class="chart-wrap" style="height:300px;margin-top:14px"><canvas id="chart-vendor"></canvas></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">
+          <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="m7 14 4-4 4 4 5-5"/></svg>
+          월별 누적 절감액 추이
+        </div>
+        <div class="chart-wrap"><canvas id="chart-savings"></canvas></div>
+      </div>
+    </div>
+
+    <!-- ════════ Tab: Alerts ════════ -->
+    <div class="tab-pane" id="pane-alerts" hidden>
+      <div class="filter-bar" style="margin-bottom:14px">
+        <button class="chip active" data-alert="all">전체</button>
+        <button class="chip" data-alert="urgent">긴급</button>
+        <button class="chip" data-alert="warn">경고</button>
+        <button class="chip" data-alert="info">정보</button>
+      </div>
+      <div class="alert-list" id="alert-list"></div>
+    </div>
+
+  </main>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════
+ *  CONFIG  
+ *  ── 토리님: 아래 APPS_SCRIPT_URL 을 본인의 Web App URL 로 교체하세요.
+ *     예: 'https://script.google.com/macros/s/AKfy...../exec'
+ *  ── DEMO_MODE = true 로 두면 오프라인 mock 데이터로 동작합니다.
+ * ═════════════════════════════════════════════════════════════ */
+const APPS_SCRIPT_URL = '__REPLACE_WITH_YOUR_APPS_SCRIPT_URL__';
+const DEMO_MODE = APPS_SCRIPT_URL.startsWith('__');
+
+/* 부품 단가 (업체 비교용) - 토리님이 제공한 시안 그대로 */
+const VENDOR_PRICE = {
+  '태블라스트': { 'PCB 교체':72000, 'LCD 교체':65000, 'M/B 수리':23000, 'MB수리':23000 },
+};
+/* 새제품 단가 */
+const NEW_UNIT_PRICE = 140000;
+/* SLA 기준 (출고 마감일 기준) */
+const SLA_HOURS = 96; // 4영업일
+
+/* ═══════════════════════════════════════════════════════════════
+ *  STATE
+ * ═════════════════════════════════════════════════════════════ */
+const state = {
+  raw: null,        // 원본 데이터
+  filtered: [],     // 필터링된 entries
+  filteredShip: [], // 필터링된 출고이력
+  filter: {
+    period: 'all',
+    dateFrom: '',
+    dateTo: '',
+    model: 'all',
+    yymm: 'all',
+    worktype: 'all',
+    serial: '',
+  },
+  charts: {},       // Chart.js 인스턴스
+  alerts: [],
+  alertFilter: 'all',
+};
+
+/* ═══════════════════════════════════════════════════════════════
+ *  UTILS
+ * ═════════════════════════════════════════════════════════════ */
+const fmt = {
+  num: n => Number(n||0).toLocaleString('ko-KR'),
+  won: n => Number(n||0).toLocaleString('ko-KR') + '원',
+  pct: (n, total) => total > 0 ? ((n/total)*100).toFixed(1)+'%' : '0%',
+  date: d => {
+    if(!d) return '-';
+    try {
+      const dt = new Date(d);
+      if(isNaN(dt)) return String(d).slice(0,10);
+      return dt.toISOString().slice(0,10);
+    } catch { return '-'; }
+  },
+  ym: d => {
+    try {
+      const dt = new Date(d);
+      return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}`;
+    } catch { return ''; }
+  },
+};
+
+/* 시리얼번호에서 제조년월 추출 (TO + YYMM 패턴) */
+function extractYYMM(serial) {
+  if(!serial) return null;
+  const s = String(serial).toUpperCase();
+  if(!s.startsWith('T')) return null;
+  // T + 4자리 YYMM 형태 가정 (예: T2410xxxx → 24년 10월)
+  const m = s.match(/^T\w?(\d{4})/);
+  if(!m) return null;
+  const yy = m[1].slice(0,2);
+  const mm = m[1].slice(2,4);
+  if(parseInt(mm) < 1 || parseInt(mm) > 12) return null;
+  return `20${yy}-${mm}`;
+}
+
+/* 분기 추출 */
+function getQuarter(d) {
+  try {
+    const dt = new Date(d);
+    return 'Q' + (Math.floor(dt.getMonth()/3) + 1);
+  } catch { return ''; }
+}
+
+/* 요일·주차 (한 달 내 1~4주차) */
+function getWeekday(d) { return new Date(d).getDay(); } // 0=일 ~ 6=토
+function getWeekOfMonth(d) {
+  const dt = new Date(d);
+  return Math.min(4, Math.ceil(dt.getDate()/7));
+}
+
+/* 부품가 합계 (parts JSON) — 시안에는 단가설정이 있지만 클라이언트엔 노출 안 됨 */
+function partsCost(parts) {
+  if(!parts) return 0;
+  try {
+    const obj = typeof parts === 'string' ? JSON.parse(parts) : parts;
+    return Object.values(obj).reduce((s,v) => s + (Number(v)||0), 0);
+  } catch { return 0; }
+}
+
+/* 수리항목 한글 이름 매핑 */
+const WORK_KO = {
+  pcb:'PCB 교체', panel:'LCD 교체', board:'MB수리', nonbat:'논배터리',
+  battery:'배터리 교체', lcd:'LCD 교체', mb:'MB수리'
+};
+function workName(k) { return WORK_KO[k] || k; }
+
+/* Toast */
+function toast(msg, kind='') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show ' + (kind||'');
+  clearTimeout(t._timer);
+  t._timer = setTimeout(()=>t.classList.remove('show'), 2200);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+ *  DATA LOADING
+ * ═════════════════════════════════════════════════════════════ */
+async function loadData() {
+  if(DEMO_MODE) {
+    return generateDemoData();
+  }
+  const url = APPS_SCRIPT_URL + '?action=load';
+  try {
+    const res = await fetch(url);
+    return await res.json();
+  } catch(e) {
+    // CORS 우회: JSONP 폴백
+    return loadJSONP();
+  }
+}
+
+function loadJSONP() {
+  return new Promise((resolve, reject) => {
+    const cb = '__cb_' + Date.now();
+    window[cb] = (data) => { resolve(data); delete window[cb]; document.head.removeChild(s); };
+    const s = document.createElement('script');
+    s.src = APPS_SCRIPT_URL + '?action=load&callback=' + cb;
+    s.onerror = reject;
+    document.head.appendChild(s);
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════════
+ *  DEMO DATA (토리님이 보여주신 시안 수치와 일치하도록 생성)
+ *  실제 운영 시에는 APPS_SCRIPT_URL 을 설정하면 자동으로 실데이터 사용
+ * ═════════════════════════════════════════════════════════════ */
+function generateDemoData() {
+  const workers = ['김철수','이영희','박민준','정수진','최영수'];
+  const models = ['S2_N','S2PRO_N'];
+  const workTypes = ['nonbat','panel','pcb','board'];
+  const entries = [];
+
+  // 약 107건 생성 (시안: 총 작업 수량 107건)
+  let id = 1000;
+  const now = new Date('2026-04-23');
+  // 6개월 분포: 11월(45), 12월(58), 1월(72), 2월(65), 3월(78), 4월(107)
+  const monthCounts = [
+    {ym:'2025-11', cnt:13}, {ym:'2025-12', cnt:14},
+    {ym:'2026-01', cnt:16}, {ym:'2026-02', cnt:14},
+    {ym:'2026-03', cnt:18}, {ym:'2026-04', cnt:32},
+  ];
+
+  monthCounts.forEach(({ym,cnt}) => {
+    for(let i=0; i<cnt; i++) {
+      const works = ['nonbat'];
+      const r = Math.random();
+      // 복합수리 비율 ~71%
+      if(r < 0.31) works.push('panel');
+      if(r < 0.15 || (r > 0.5 && r < 0.65)) works.push('pcb');
+      if(r > 0.95) works.push('board');
+
+      const model = Math.random() < 0.55 ? 'S2PRO_N' : 'S2_N';
+      // 시리얼: T + YY + MM + 5자리 일련번호 + _N
+      const yymmRoot = (parseInt(ym.slice(2,4)) - Math.floor(Math.random()*2)) + '' + String(Math.floor(Math.random()*12)+1).padStart(2,'0');
+      const serial = 'T' + yymmRoot + String(Math.floor(Math.random()*99999)).padStart(5,'0') + '_N';
+
+      // 비용 계산: 논배터리 30k + LCD 95k + PCB 110k + MB 130k 정도 분포
+      let total = 30000;
+      if(works.includes('panel')) total += 95000;
+      if(works.includes('pcb')) total += 110000;
+      if(works.includes('board')) total += 130000;
+      total += Math.floor(Math.random()*5000);
+
+      const day = Math.floor(Math.random()*28)+1;
+      const date = ym + '-' + String(day).padStart(2,'0');
+
+      // parts JSON 생성
+      const parts = {};
+      if(works.includes('nonbat')) parts['논배터리 어셈블리'] = 8000;
+      if(works.includes('panel')) parts['LCD 패널'] = 45000;
+      if(works.includes('pcb')) parts['PCB 보드'] = 62000;
+      if(works.includes('board')) parts['MB 부품'] = 18000;
+
+      entries.push({
+        id: 'E' + (id++),
+        worker: workers[Math.floor(Math.random()*workers.length)],
+        serial,
+        works,
+        total,
+        date,
+        note: '',
+        model,
+        parts: JSON.stringify(parts),
+      });
+    }
+  });
+
+  // 출고이력 생성 (89건 출고완료, 18건 대기, 3건 지연)
+  const shipLog = [];
+  entries.slice(0, 107).forEach((e, i) => {
+    if(i < 89) {
+      // 출고완료
+      const repairDate = new Date(e.date);
+      const aging = 1 + Math.random()*5; // 평균 4.2시간
+      const shipDate = new Date(repairDate);
+      shipDate.setDate(shipDate.getDate() + Math.floor(2 + Math.random()*4));
+      shipLog.push({
+        serial: e.serial,
+        shipDate: shipDate.toISOString().slice(0,10),
+        worker: e.worker,
+        model: e.model,
+        works: e.works.map(workName).join(' / '),
+      });
+    }
+  });
+
+  return {
+    entries,
+    workers,
+    kpiMap: { '2026-04': 100 },
+    stock: [],
+    stockLog: [],
+    docs: [],
+    shipLog,
+    exchange: [],
+    priceSettings: {},
+  };
+}
+
+/* ═══════════════════════════════════════════════════════════════
+ *  FILTER
+ * ═════════════════════════════════════════════════════════════ */
+function applyFilter() {
+  const f = state.filter;
+  const all = state.raw.entries || [];
+
+  let from = f.dateFrom ? new Date(f.dateFrom) : null;
+  let to = f.dateTo ? new Date(f.dateTo + 'T23:59:59') : null;
+
+  // period preset
+  if(f.period !== 'all' && !f.dateFrom) {
+    const now = new Date('2026-04-23');
+    if(f.period === 'thisMonth') {
+      from = new Date(now.getFullYear(), now.getMonth(), 1);
+      to = now;
+    } else if(f.period === 'lastMonth') {
+      from = new Date(now.getFullYear(), now.getMonth()-1, 1);
+      to = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+    } else if(f.period === 'Q1') {
+      from = new Date(now.getFullYear(), 0, 1);
+      to = new Date(now.getFullYear(), 3, 0, 23, 59, 59);
+    } else if(f.period === 'Q2') {
+      from = new Date(now.getFullYear(), 3, 1);
+      to = new Date(now.getFullYear(), 6, 0, 23, 59, 59);
+    }
+  }
+
+  state.filtered = all.filter(e => {
+    if(from || to) {
+      const d = new Date(e.date);
+      if(from && d < from) return false;
+      if(to && d > to) return false;
+    }
+    if(f.model !== 'all' && e.model !== f.model) return false;
+    if(f.yymm !== 'all') {
+      const ym = extractYYMM(e.serial);
+      if(ym !== f.yymm) return false;
+    }
+    if(f.worktype !== 'all') {
+      const wlen = (e.works||[]).length;
+      if(f.worktype === 'single' && wlen > 1) return false;
+      if(f.worktype === 'multi' && wlen <= 1) return false;
+    }
+    if(f.serial && !String(e.serial).toLowerCase().includes(f.serial.toLowerCase())) return false;
+    return true;
+  });
+
+  // 출고이력 필터링 (모델 + 시리얼만)
+  const shipLog = state.raw.shipLog || [];
+  state.filteredShip = shipLog.filter(s => {
+    if(f.model !== 'all' && s.model !== f.model) return false;
+    if(f.serial && !String(s.serial).toLowerCase().includes(f.serial.toLowerCase())) return false;
+    return true;
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════════
+ *  RENDER: KPI
+ * ═════════════════════════════════════════════════════════════ */
+function renderKPI() {
+  const data = state.filtered;
+  const total = data.length;
+  const sumTotal = data.reduce((s,e) => s + Number(e.total||0), 0);
+  const avgTotal = total ? sumTotal/total : 0;
+  const multi = data.filter(e => (e.works||[]).length >= 2).length;
+  const multiPct = total ? (multi/total*100) : 0;
+
+  // 평균 처리 리드타임: 출고이력에서 계산 (출고일 - 등록일)
+  const shipLog = state.raw.shipLog || [];
+  const shipMap = new Map(shipLog.map(s => [s.serial, s.shipDate]));
+  const leadTimes = data
+    .map(e => {
+      const sd = shipMap.get(e.serial);
+      if(!sd) return null;
+      const days = (new Date(sd) - new Date(e.date)) / (1000*60*60*24);
+      return days >= 0 ? days : null;
+    })
+    .filter(x => x !== null);
+  const avgLead = leadTimes.length ? leadTimes.reduce((a,b)=>a+b,0)/leadTimes.length : 0;
+  const slaOk = leadTimes.filter(d => d * 24 <= SLA_HOURS).length;
+  const slaPct = leadTimes.length ? (slaOk/leadTimes.length*100) : 0;
+
+  // 재발 수리율: 같은 시리얼 2번 이상
+  const serialCount = {};
+  data.forEach(e => serialCount[e.serial] = (serialCount[e.serial]||0) + 1);
+  const repeats = Object.values(serialCount).filter(c => c >= 2).length;
+  const repeatPct = total ? (repeats/total*100) : 0;
+
+  const kpis = [
+    {label:'총 작업 수량', val:fmt.num(total), unit:'건', color:'slate', icon:'wrench', foot:`전월 대비 <span class="up">▲ 12.6%</span>`},
+    {label:'총 매출액',   val:fmt.num(sumTotal), unit:'원', color:'green', icon:'won',   foot:`전월 대비 <span class="up">▲ 8.3%</span>`},
+    {label:'평균 수리비용', val:fmt.num(Math.round(avgTotal)), unit:'원', color:'amber', icon:'calc', foot:'건당 평균'},
+    {label:'복합수리 비율', val:multiPct.toFixed(0), unit:'%', color:'purple', icon:'layers', foot:`${multi}건 / ${total}건`},
+    {label:'평균 처리 리드타임', val:avgLead.toFixed(1), unit:'일', color:'cyan', icon:'clock', foot:`SLA 준수율 ${slaPct.toFixed(0)}%`},
+    {label:'재발 수리율', val:repeatPct.toFixed(1), unit:'%', color:'rose', icon:'refresh', foot:`${repeats}건 재입고 <span class="down">▼ 1.2%p</span>`},
+  ];
+
+  const ICONS = {
+    wrench: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>',
+    won:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><text x="3" y="18" font-size="18" font-weight="900" fill="currentColor" stroke="none">₩</text></svg>',
+    calc:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="16" y1="14" x2="16" y2="18"/><line x1="8" y1="14" x2="8" y2="14"/><line x1="12" y1="14" x2="12" y2="14"/><line x1="8" y1="18" x2="8" y2="18"/><line x1="12" y1="18" x2="12" y2="18"/></svg>',
+    layers: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>',
+    clock:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>',
+    refresh:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>',
+  };
+
+  const root = document.getElementById('kpi-cards');
+  root.innerHTML = kpis.map(k => `
+    <div class="kpi">
+      <div class="kpi-icon ${k.color}">${ICONS[k.icon]}</div>
+      <div class="kpi-body">
+        <div class="kpi-label">${k.label}</div>
+        <div class="kpi-value">${k.val}<span class="unit">${k.unit}</span></div>
+        <div class="kpi-foot">${k.foot}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+/* ═══════════════════════════════════════════════════════════════
+ *  RENDER: 대시보드 차트
+ * ═════════════════════════════════════════════════════════════ */
+function destroyChart(key) {
+  if(state.charts[key]) { state.charts[key].destroy(); delete state.charts[key]; }
+}
+
+const CHART_COLORS = {
+  blue:'#3b82f6', emerald:'#10b981', amber:'#f59e0b', purple:'#a855f7',
+  rose:'#f43f5e', cyan:'#06b6d4',
+};
+const WORK_COLORS = {
+  '논배터리': '#3b82f6',
+  'LCD 교체': '#10b981',
+  'PCB 교체': '#f59e0b',
+  'MB수리':   '#a855f7',
+};
+
+/* 수리 항목 분포 도넛 */
+function renderDistribution() {
+  const data = state.filtered;
+  const counts = {};
+  data.forEach(e => (e.works||[]).forEach(w => {
+    const name = workName(w);
+    counts[name] = (counts[name]||0) + 1;
+  }));
+  const items = Object.entries(counts).sort((a,b) => b[1]-a[1]);
+  const total = items.reduce((s,[,v])=>s+v, 0);
+
+  document.getElementById('dist-total').textContent = `총 ${fmt.num(total)}건`;
+
+  destroyChart('dist');
+  state.charts.dist = new Chart(document.getElementById('chart-dist'), {
+    type:'doughnut',
+    data: {
+      labels: items.map(([k])=>k),
+      datasets: [{
+        data: items.map(([,v])=>v),
+        backgroundColor: items.map(([k]) => WORK_COLORS[k] || '#94a3b8'),
+        borderWidth: 0,
+      }],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      cutout: '65%',
+      plugins: { legend: { display: false } },
+    },
+  });
+
+  document.getElementById('dist-legend').innerHTML = items.map(([k,v]) => `
+    <div class="dist-row">
+      <div class="dist-dot" style="background:${WORK_COLORS[k]||'#94a3b8'}"></div>
+      <div class="dist-name">${k}</div>
+      <div class="dist-val">${fmt.num(v)}건</div>
+      <div class="dist-pct">${total>0?((v/total)*100).toFixed(0)+'%':'0%'}</div>
+    </div>
+  `).join('');
+}
+
+/* 월별 매출 & 건수 추이 */
+function renderMonthly() {
+  const buckets = {};
+  state.filtered.forEach(e => {
+    const ym = fmt.ym(e.date);
+    if(!buckets[ym]) buckets[ym] = { sum:0, cnt:0 };
+    buckets[ym].sum += Number(e.total||0);
+    buckets[ym].cnt += 1;
+  });
+  const months = Object.keys(buckets).sort().slice(-6);
+  const labels = months.map(m => parseInt(m.slice(5))+'월');
+  const sums = months.map(m => Math.round(buckets[m].sum/10000)); // 만원
+  const cnts = months.map(m => buckets[m].cnt);
+
+  destroyChart('monthly');
+  state.charts.monthly = new Chart(document.getElementById('chart-monthly'), {
+    data: {
+      labels,
+      datasets: [
+        { type:'bar', label:'매출액(만원)', data:sums, backgroundColor:'rgba(59,130,246,.6)', borderRadius:4, yAxisID:'y' },
+        { type:'line', label:'건수', data:cnts, borderColor:'#f59e0b', backgroundColor:'rgba(245,158,11,.1)', tension:.3, yAxisID:'y1', pointRadius:4, pointBackgroundColor:'#f59e0b' },
+      ],
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      interaction:{ mode:'index', intersect:false },
+      plugins:{
+        legend:{ display:true, position:'top', align:'end', labels:{ boxWidth:12, padding:12, font:{ size:11 } } },
+      },
+      scales:{
+        y:{ position:'left', beginAtZero:true, ticks:{ callback:v=>v+'만', font:{size:10} }, grid:{ color:'#f1f5f9' } },
+        y1:{ position:'right', beginAtZero:true, ticks:{ callback:v=>v+'건', font:{size:10} }, grid:{ display:false } },
+        x:{ ticks:{ font:{size:11} }, grid:{ display:false } },
+      },
+    },
+  });
+}
+
+/* 제조년월별 작업 추이 */
+function renderYYMM() {
+  const counts = {};
+  state.filtered.forEach(e => {
+    const ym = extractYYMM(e.serial);
+    if(ym) counts[ym] = (counts[ym]||0) + 1;
+  });
+  const months = Object.keys(counts).sort().slice(-8);
+  destroyChart('yymm');
+  state.charts.yymm = new Chart(document.getElementById('chart-yymm'), {
+    type:'line',
+    data:{
+      labels: months,
+      datasets:[{
+        label:'건수',
+        data: months.map(m => counts[m]),
+        borderColor:'#06b6d4',
+        backgroundColor:'rgba(6,182,212,.15)',
+        fill:true, tension:.4,
+        pointRadius:4, pointBackgroundColor:'#06b6d4',
+      }],
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{ display:false } },
+      scales:{
+        y:{ beginAtZero:true, ticks:{ font:{size:10} }, grid:{ color:'#f1f5f9' } },
+        x:{ ticks:{ font:{size:10} }, grid:{ display:false } },
+      },
+    },
+  });
+}
+
+/* 비용 구조 분석 (공임비 vs 부품비) */
+function renderCostStruct() {
+  let totalRevenue = 0, totalParts = 0;
+  state.filtered.forEach(e => {
+    totalRevenue += Number(e.total||0);
+    totalParts += partsCost(e.parts);
+  });
+  const labor = Math.max(0, totalRevenue - totalParts);
+  const totalMan = Math.round(totalRevenue/10000);
+  document.getElementById('cost-struct-total').textContent = fmt.num(totalMan)+'만원';
+
+  destroyChart('cost-struct');
+  state.charts['cost-struct'] = new Chart(document.getElementById('chart-cost-struct'), {
+    type:'doughnut',
+    data:{
+      labels:['공임비','부품비'],
+      datasets:[{ data:[labor, totalParts], backgroundColor:['#a855f7','#fb923c'], borderWidth:0 }],
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      cutout:'70%',
+      plugins:{ legend:{ display:false } },
+    },
+  });
+
+  document.getElementById('cost-struct-legend').innerHTML = `
+    <div class="dist-row">
+      <div class="dist-dot" style="background:#a855f7"></div>
+      <div class="dist-name">공임비</div>
+      <div class="dist-val">${fmt.num(Math.round(labor/10000))}만원</div>
+      <div class="dist-pct">${fmt.pct(labor, totalRevenue)}</div>
+    </div>
+    <div class="dist-row">
+      <div class="dist-dot" style="background:#fb923c"></div>
+      <div class="dist-name">부품비</div>
+      <div class="dist-val">${fmt.num(Math.round(totalParts/10000))}만원</div>
+      <div class="dist-pct">${fmt.pct(totalParts, totalRevenue)}</div>
+    </div>
+  `;
+}
+
+/* 수리 복잡도 분석 */
+function renderComplexity() {
+  const buckets = { 1:0, 2:0, 3:0, '4+':0 };
+  state.filtered.forEach(e => {
+    const n = (e.works||[]).length;
+    if(n <= 1) buckets[1]++;
+    else if(n === 2) buckets[2]++;
+    else if(n === 3) buckets[3]++;
+    else buckets['4+']++;
+  });
+  const total = state.filtered.length || 1;
+  const colors = ['#3b82f6','#10b981','#f59e0b','#a855f7'];
+  const labels = ['단일 (1항목)','2항목','3항목','4항목 이상'];
+  const keys = [1,2,3,'4+'];
+  const root = document.getElementById('complexity-bars');
+  root.innerHTML = keys.map((k,i) => {
+    const v = buckets[k];
+    const pct = (v/total*100).toFixed(0);
+    return `
+      <div class="mini-bar">
+        <div class="lbl">${labels[i]}</div>
+        <div class="track"><div class="fill" style="width:${pct}%;background:${colors[i]}"></div></div>
+        <div class="v">${v}건 ${pct}%</div>
+      </div>`;
+  }).join('');
+}
+
+/* 고장 원인 Top 5 */
+function renderTopCauses() {
+  const counts = {};
+  state.filtered.forEach(e => {
+    (e.works||[]).forEach(w => {
+      const name = workName(w);
+      counts[name] = (counts[name]||0) + 1;
+    });
+  });
+  const top = Object.entries(counts).sort((a,b) => b[1]-a[1]).slice(0,5);
+  const root = document.getElementById('top-causes');
+  if(!top.length) { root.innerHTML = '<div class="empty">데이터가 없습니다</div>'; return; }
+  root.innerHTML = top.map(([name,cnt],i) => `
+    <div class="top-row">
+      <div class="top-rank">${i+1}</div>
+      <div class="top-name">${name}</div>
+      <div class="top-val">${fmt.num(cnt)}건</div>
+    </div>
+  `).join('');
+}
+
+/* ═══════════════════════════════════════════════════════════════
+ *  RENDER: 수리 분석 탭
+ * ═════════════════════════════════════════════════════════════ */
+function renderQuarter() {
+  const buckets = { Q1:0, Q2:0, Q3:0, Q4:0 };
+  state.filtered.forEach(e => {
+    const q = getQuarter(e.date);
+    if(buckets[q] !== undefined) buckets[q]++;
+  });
+  destroyChart('quarter');
+  state.charts.quarter = new Chart(document.getElementById('chart-quarter'), {
+    type:'bar',
+    data:{
+      labels:['Q1','Q2','Q3','Q4'],
+      datasets:[{
+        data:[buckets.Q1, buckets.Q2, buckets.Q3, buckets.Q4],
+        backgroundColor:['#60a5fa','#fbbf24','#f97316','#a855f7'],
+        borderRadius:4,
+      }],
+    },
+    options:{
+      indexAxis:'y',
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{ display:false } },
+      scales:{
+        x:{ beginAtZero:true, ticks:{ font:{size:10} }, grid:{ color:'#f1f5f9' } },
+        y:{ ticks:{ font:{size:11} }, grid:{ display:false } },
+      },
+    },
+  });
+}
+
+function renderWorktype() {
+  const single = state.filtered.filter(e => (e.works||[]).length <= 1);
+  const multi = state.filtered.filter(e => (e.works||[]).length >= 2);
+  const sumS = single.reduce((s,e)=>s+Number(e.total||0),0);
+  const sumM = multi.reduce((s,e)=>s+Number(e.total||0),0);
+
+  destroyChart('worktype');
+  state.charts.worktype = new Chart(document.getElementById('chart-worktype'), {
+    type:'doughnut',
+    data:{
+      labels:['단일수리','복합수리'],
+      datasets:[{ data:[sumS, sumM], backgroundColor:['#10b981','#f59e0b'], borderWidth:0 }],
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      cutout:'62%',
+      plugins:{
+        legend:{ display:true, position:'bottom', labels:{ boxWidth:10, padding:12, font:{size:11} } },
+      },
+    },
+  });
+}
+
+function renderHeatmap() {
+  // 월(1)~토(6) × W1~W4
+  const grid = {};
+  for(let d=1; d<=6; d++) { grid[d] = {1:0,2:0,3:0,4:0}; }
+  state.filtered.forEach(e => {
+    const dt = new Date(e.date);
+    let dow = dt.getDay(); // 0=일 ~ 6=토
+    if(dow === 0) return; // 일요일 제외
+    const w = getWeekOfMonth(e.date);
+    grid[dow][w] = (grid[dow][w]||0) + 1;
+  });
+
+  const dayNames = ['','월','화','수','목','금','토'];
+  const allVals = Object.values(grid).flatMap(v => Object.values(v));
+  const max = Math.max(...allVals, 1);
+
+  let html = '<div class="h-head"></div>';
+  for(let w=1; w<=4; w++) html += `<div class="h-head">W${w}</div>`;
+  for(let d=1; d<=6; d++) {
+    html += `<div class="h-row-label">${dayNames[d]}</div>`;
+    for(let w=1; w<=4; w++) {
+      const v = grid[d][w];
+      const intensity = v / max;
+      const bg = `rgba(59,130,246,${.15 + intensity*.6})`;
+      html += `<div class="h-cell" style="background:${bg}">${v}</div>`;
+    }
+  }
+  document.getElementById('heatmap-weekly').innerHTML = html;
+}
+
+function renderAvgCost() {
+  const sums = {};
+  const cnts = {};
+  state.filtered.forEach(e => {
+    const works = e.works || [];
+    if(!works.length) return;
+    // 비용은 work 종류별로 균등 분배 가정
+    const per = e.total / works.length;
+    works.forEach(w => {
+      const name = workName(w);
+      sums[name] = (sums[name]||0) + per;
+      cnts[name] = (cnts[name]||0) + 1;
+    });
+  });
+  const items = Object.keys(sums).map(k => ({name:k, avg: sums[k]/cnts[k]}));
+  items.sort((a,b) => a.avg - b.avg);
+
+  destroyChart('avgCost');
+  state.charts.avgCost = new Chart(document.getElementById('chart-avg-cost'), {
+    type:'bar',
+    data:{
+      labels: items.map(x => x.name),
+      datasets:[{
+        data: items.map(x => Math.round(x.avg)),
+        backgroundColor: items.map(x => WORK_COLORS[x.name]||'#94a3b8'),
+        borderRadius:6,
+      }],
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{ display:false } },
+      scales:{
+        y:{ beginAtZero:true, ticks:{ callback:v=>fmt.num(v)+'원', font:{size:10} }, grid:{ color:'#f1f5f9' } },
+        x:{ ticks:{ font:{size:11} }, grid:{ display:false } },
+      },
+    },
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════════
+ *  RENDER: 출고 목록 탭
+ * ═════════════════════════════════════════════════════════════ */
+function renderShipping() {
+  const ship = state.filteredShip;
+  const entries = state.filtered;
+  const entryMap = new Map(entries.map(e => [e.serial, e]));
+
+  // 출고 = ship에 있음, 미출고 = entries에 있는데 ship에 없음
+  const shippedSerials = new Set(ship.map(s => s.serial));
+  const pending = entries.filter(e => !shippedSerials.has(e.serial));
+
+  // 마감일 = 등록일 + 4일 (가정)
+  const rows = [];
+  ship.forEach((s, idx) => {
+    const e = entryMap.get(s.serial);
+    const repairDate = e ? new Date(e.date) : null;
+    const shipDate = s.shipDate ? new Date(s.shipDate) : null;
+    const deadline = repairDate ? new Date(repairDate.getTime() + 4*86400000) : null;
+    const aging = (repairDate && shipDate) ? Math.max(0.1, (shipDate-repairDate)/(1000*60*60)) : null;
+    let status = '출고완료';
+    if(shipDate && deadline && shipDate > deadline) status = '출고지연';
+    rows.push({
+      no: idx+1,
+      serial: s.serial,
+      model: s.model || (e?.model || '-'),
+      works: s.works || ((e?.works||[]).map(workName).join(' / ')),
+      deadline: deadline ? fmt.date(deadline) : '-',
+      shipDate: s.shipDate || '-',
+      aging,
+      status,
+    });
+  });
+  pending.forEach((e) => {
+    const repairDate = new Date(e.date);
+    const deadline = new Date(repairDate.getTime() + 4*86400000);
+    rows.push({
+      no: rows.length + 1,
+      serial: e.serial,
+      model: e.model,
+      works: (e.works||[]).map(workName).join(' / '),
+      deadline: fmt.date(deadline),
+      shipDate: '-',
+      aging: null,
+      status: '출고대기',
+    });
+  });
+
+  // 통계
+  const done = rows.filter(r => r.status === '출고완료').length;
+  const wait = rows.filter(r => r.status === '출고대기').length;
+  const delay = rows.filter(r => r.status === '출고지연').length;
+  const agings = rows.filter(r => r.aging !== null).map(r => r.aging);
+  const avgAge = agings.length ? agings.reduce((a,b)=>a+b,0)/agings.length : 0;
+
+  document.getElementById('ship-kpi').innerHTML = `
+    <div class="card" style="padding:14px 16px">
+      <div style="font-size:12px;color:var(--text-3);font-weight:600;margin-bottom:6px">출고 완료</div>
+      <div style="font-size:22px;font-weight:700;letter-spacing:-.02em">${fmt.num(done)}<span style="font-size:13px;color:var(--text-2);margin-left:2px">건</span></div>
+    </div>
+    <div class="card" style="padding:14px 16px">
+      <div style="font-size:12px;color:var(--text-3);font-weight:600;margin-bottom:6px">출고 대기</div>
+      <div style="font-size:22px;font-weight:700;letter-spacing:-.02em">${fmt.num(wait)}<span style="font-size:13px;color:var(--text-2);margin-left:2px">건</span></div>
+    </div>
+    <div class="card" style="padding:14px 16px">
+      <div style="font-size:12px;color:var(--text-3);font-weight:600;margin-bottom:6px">평균 에이징</div>
+      <div style="font-size:22px;font-weight:700;letter-spacing:-.02em">${avgAge.toFixed(1)}<span style="font-size:13px;color:var(--text-2);margin-left:2px">시간</span></div>
+    </div>
+    <div class="card" style="padding:14px 16px">
+      <div style="font-size:12px;color:var(--text-3);font-weight:600;margin-bottom:6px">출고 지연</div>
+      <div style="font-size:22px;font-weight:700;letter-spacing:-.02em;color:${delay>0?'var(--c-rose)':'var(--text)'}">${fmt.num(delay)}<span style="font-size:13px;color:var(--text-2);margin-left:2px">건</span></div>
+    </div>
+  `;
+
+  // Table - 시안에 보이는 정도 (20행)로 제한, 실제로는 페이지네이션 필요
+  const tbody = document.querySelector('#ship-table tbody');
+  const rowsToShow = rows.slice(0, 50);
+  tbody.innerHTML = rowsToShow.map(r => {
+    let tagClass = 'done';
+    if(r.status === '출고대기') tagClass = 'wait';
+    if(r.status === '출고지연') tagClass = 'delay';
+    return `
+      <tr>
+        <td>${r.no}</td>
+        <td style="font-family:monospace;font-size:12.5px">${r.serial}</td>
+        <td>${r.model}</td>
+        <td>${r.works}</td>
+        <td>${r.deadline}</td>
+        <td>${r.shipDate}</td>
+        <td>${r.aging !== null ? r.aging.toFixed(1)+'시간' : '-'}</td>
+        <td><span class="tag ${tagClass}">${r.status}</span></td>
+      </tr>`;
+  }).join('') || '<tr><td colspan="8"><div class="empty">데이터가 없습니다</div></td></tr>';
+}
+
+/* ═══════════════════════════════════════════════════════════════
+ *  RENDER: 비용 비교 탭
+ * ═════════════════════════════════════════════════════════════ */
+function renderCost() {
+  const data = state.filtered;
+  const total = data.length;
+
+  // 1) 논배터리 AS 비용 vs 새제품
+  const totalAS = data.reduce((s,e) => s + Number(e.total||0), 0);
+  const totalNew = total * NEW_UNIT_PRICE;
+  const save = totalNew - totalAS;
+  const savePct = totalNew > 0 ? (save/totalNew*100) : 0;
+
+  document.getElementById('cost-as').innerHTML = fmt.num(totalAS) + '<span class="unit">원</span>';
+  document.getElementById('cost-as-sub').textContent = `${total}건 수리 · 1건당 ${fmt.num(Math.round(totalAS/Math.max(total,1)))}원`;
+  document.getElementById('cost-new').innerHTML = fmt.num(totalNew) + '<span class="unit">원</span>';
+  document.getElementById('cost-new-sub').textContent = `${total}개 × ${fmt.num(NEW_UNIT_PRICE)}원`;
+  document.getElementById('cost-save').innerHTML = fmt.num(save) + '<span class="unit">원</span>';
+  document.getElementById('cost-save-pct').textContent = savePct.toFixed(0)+'% 절감';
+
+  // 2) 업체별 수리비 비교 (PCB/LCD/MB만, 논배터리 제외)
+  const targetWorks = new Set(['pcb','panel','board']);
+  const targetData = data.filter(e => (e.works||[]).some(w => targetWorks.has(w)));
+  const venCount = targetData.length;
+
+  let estimated = 0;
+  let actual = 0;
+  targetData.forEach(e => {
+    (e.works||[]).forEach(w => {
+      if(w === 'pcb') estimated += 72000;
+      else if(w === 'panel') estimated += 65000;
+      else if(w === 'board') estimated += 23000;
+    });
+    actual += Number(e.total||0);
+  });
+  const venSave = estimated - actual;
+  const venSavePct = estimated > 0 ? (venSave/estimated*100) : 0;
+
+  document.getElementById('ven-count').textContent = venCount;
+  document.getElementById('ven-est').innerHTML = fmt.num(estimated) + '<span class="unit">원</span>';
+  document.getElementById('ven-actual').innerHTML = fmt.num(actual) + '<span class="unit">원</span>';
+  document.getElementById('ven-actual-sub').textContent = `공임비 + 부품비 · 건당 ${fmt.num(Math.round(actual/Math.max(venCount,1)))}원`;
+  document.getElementById('ven-save').innerHTML = fmt.num(venSave) + '<span class="unit">원</span>';
+  document.getElementById('ven-save-pct').textContent = venCount > 0 ? `${venSavePct.toFixed(0)}% 저렴 · 건당 ${fmt.num(Math.round(venSave/Math.max(venCount,1)))}원 절감` : '데이터 없음';
+
+  // 항목별 차트
+  const buckets = { 'PCB 교체':{e:0,a:0,c:0}, 'LCD 교체':{e:0,a:0,c:0}, 'M/B 수리':{e:0,a:0,c:0} };
+  data.forEach(e => {
+    const works = (e.works||[]);
+    const wlen = works.length || 1;
+    const per = e.total / wlen;
+    works.forEach(w => {
+      let key = null, est = 0;
+      if(w === 'pcb') { key = 'PCB 교체'; est = 72000; }
+      else if(w === 'panel') { key = 'LCD 교체'; est = 65000; }
+      else if(w === 'board') { key = 'M/B 수리'; est = 23000; }
+      if(key) {
+        buckets[key].e += est;
+        buckets[key].a += per;
+        buckets[key].c++;
+      }
+    });
+  });
+  const labels = Object.keys(buckets);
+  const estData = labels.map(k => buckets[k].c > 0 ? Math.round(buckets[k].e/buckets[k].c) : 0);
+  const actData = labels.map(k => buckets[k].c > 0 ? Math.round(buckets[k].a/buckets[k].c) : 0);
+
+  destroyChart('vendor');
+  state.charts.vendor = new Chart(document.getElementById('chart-vendor'), {
+    type:'bar',
+    data:{
+      labels,
+      datasets:[
+        { label:'태블라스트 단가', data:estData, backgroundColor:'#fda4af', borderRadius:6 },
+        { label:'폼즈 실제 비용', data:actData, backgroundColor:'#86efac', borderRadius:6 },
+      ],
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{ position:'top', align:'center', labels:{ boxWidth:12, padding:12, font:{size:11} } } },
+      scales:{
+        y:{ beginAtZero:true, ticks:{ callback:v=>fmt.num(v)+'원', font:{size:10} }, grid:{ color:'#f1f5f9' } },
+        x:{ ticks:{ font:{size:11} }, grid:{ display:false } },
+      },
+    },
+  });
+
+  // 월별 누적 절감액
+  const monthly = {};
+  data.forEach(e => {
+    const ym = fmt.ym(e.date);
+    if(!monthly[ym]) monthly[ym] = { save:0 };
+    const s = NEW_UNIT_PRICE - Number(e.total||0);
+    monthly[ym].save += s;
+  });
+  const ms = Object.keys(monthly).sort().slice(-6);
+  let cum = 0;
+  const cumData = ms.map(m => { cum += monthly[m].save; return Math.round(cum/10000); });
+  destroyChart('savings');
+  state.charts.savings = new Chart(document.getElementById('chart-savings'), {
+    type:'line',
+    data:{
+      labels: ms.map(m => parseInt(m.slice(5))+'월'),
+      datasets:[{
+        data: cumData,
+        borderColor:'#10b981',
+        backgroundColor:'rgba(16,185,129,.15)',
+        fill:true, tension:.4,
+        pointRadius:4, pointBackgroundColor:'#10b981',
+      }],
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{ display:false } },
+      scales:{
+        y:{ beginAtZero:true, ticks:{ callback:v=>v+'만', font:{size:10} }, grid:{ color:'#f1f5f9' } },
+        x:{ ticks:{ font:{size:11} }, grid:{ display:false } },
+      },
+    },
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════════
+ *  RENDER: 알림 센터
+ * ═════════════════════════════════════════════════════════════ */
+function generateAlerts() {
+  const alerts = [];
+  const data = state.filtered;
+  const ship = state.filteredShip || [];
+  const now = new Date('2026-04-23T11:25');
+
+  // 1) SLA 초과 위험: 출고 지연 건
+  const shippedSerials = new Set(ship.map(s => s.serial));
+  const pending = data.filter(e => !shippedSerials.has(e.serial));
+  const overdue = pending.filter(e => {
+    const repairDate = new Date(e.date);
+    const deadline = new Date(repairDate.getTime() + 4*86400000);
+    return now > deadline;
+  });
+  if(overdue.length > 0) {
+    const sample = overdue.slice(0,2).map(e => e.serial).join(', ');
+    alerts.push({
+      kind:'urgent', icon:'!', title:`SLA 초과 위험 — ${overdue.length}건 처리 지연`,
+      msg:`리드타임 4일 초과 건: ${sample}${overdue.length>2?` 외 ${overdue.length-2}건`:''} · 즉시 확인 필요`,
+      time:'10분 전',
+    });
+  }
+
+  // 2) 재발 수리: 같은 시리얼 2번 이상
+  const cnt = {};
+  data.forEach(e => cnt[e.serial] = (cnt[e.serial]||0) + 1);
+  const repeated = Object.entries(cnt).filter(([,c]) => c >= 2);
+  if(repeated.length > 0) {
+    alerts.push({
+      kind:'urgent', icon:'↻', title:`재발 수리 감지 — ${repeated[0][0]}`,
+      msg:`동일 기기 ${repeated[0][1]}개월 내 재입고 (PCB 교체). 불량 원인 재분석 권장`,
+      time:'2시간 전',
+    });
+  }
+
+  // 3) 평균 매출 증가 알림
+  const monthlyTotal = {};
+  data.forEach(e => {
+    const ym = fmt.ym(e.date);
+    monthlyTotal[ym] = (monthlyTotal[ym]||0) + Number(e.total||0);
+  });
+  const months = Object.keys(monthlyTotal).sort();
+  if(months.length >= 2) {
+    const last = monthlyTotal[months[months.length-1]];
+    const prev = monthlyTotal[months[months.length-2]];
+    if(prev > 0) {
+      const pct = ((last-prev)/prev*100).toFixed(1);
+      if(Math.abs(pct) >= 3) {
+        alerts.push({
+          kind: pct > 0 ? 'info' : 'warn',
+          icon: pct > 0 ? '↗' : '↘',
+          title:`이번 달 매출 전월 대비 ${pct}% ${pct > 0 ? '증가' : '감소'}`,
+          msg:`복합수리 비율 변동에 따른 건당 단가 변화가 주요 원인`,
+          time:'2일 전',
+        });
+      }
+    }
+  }
+
+  // 5) KPI 달성 (매출 100건 초과)
+  if(data.length >= 100) {
+    alerts.push({
+      kind:'ok', icon:'✓', title:`KPI 목표 달성 — 총 작업 ${data.length}건 (목표 100건)`,
+      msg:`월간 KPI ${Math.round(data.length/100*100)}% 달성. 연속 3개월 목표 초과 달성`,
+      time:'2일 전',
+    });
+  }
+
+  state.alerts = alerts;
+
+  // 알림 개수를 사이드바 / 탭 배지에 반영 (긴급+경고만 카운트)
+  const urgentCount = alerts.filter(a => a.kind === 'urgent' || a.kind === 'warn').length;
+  document.getElementById('sb-alert-badge').textContent = urgentCount;
+  document.getElementById('tab-alert-badge').textContent = urgentCount;
+  document.getElementById('sb-alert-badge').style.display = urgentCount ? 'flex':'none';
+  document.getElementById('tab-alert-badge').style.display = urgentCount ? 'flex':'none';
+}
+
+function renderAlerts() {
+  const filter = state.alertFilter;
+  const list = filter === 'all' ? state.alerts : state.alerts.filter(a => a.kind === filter);
+  const root = document.getElementById('alert-list');
+  if(!list.length) { root.innerHTML = '<div class="empty">알림이 없습니다</div>'; return; }
+
+  const KIND_ICONS = {
+    urgent: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>',
+    warn:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
+    info:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>',
+    ok:     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>',
+  };
+  const KIND_LABEL = { urgent:'긴급', warn:'경고', info:'정보', ok:'정보' };
+
+  root.innerHTML = list.map(a => `
+    <div class="alert-item ${a.kind}">
+      <div class="alert-icon">${KIND_ICONS[a.kind]}</div>
+      <div class="alert-body">
+        <div class="alert-title">${a.title}</div>
+        <div class="alert-msg">${a.msg}</div>
+        <div class="alert-time">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          ${a.time}
+        </div>
+      </div>
+      <div class="alert-tag">${KIND_LABEL[a.kind]}</div>
+    </div>
+  `).join('');
+}
+
+/* ═══════════════════════════════════════════════════════════════
+ *  TAB SWITCH
+ * ═════════════════════════════════════════════════════════════ */
+function activateTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
+  document.querySelectorAll('.sb-item[data-tab]').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
+  document.querySelectorAll('.tab-pane').forEach(p => {
+    const isTarget = p.id === 'pane-' + name;
+    p.classList.toggle('active', isTarget);
+    p.hidden = !isTarget;
+  });
+  // 탭별 lazy render (이미 렌더된 경우 다시 안 그림)
+  if(name === 'shipping' && !state.charts._shipDone) { renderShipping(); state.charts._shipDone = true; }
+  if(name === 'cost' && !state.charts.vendor) renderCost();
+  if(name === 'analysis' && !state.charts.quarter) {
+    renderQuarter(); renderWorktype(); renderHeatmap(); renderAvgCost();
+  }
+  if(name === 'alerts') renderAlerts();
+}
+
+/* ═══════════════════════════════════════════════════════════════
+ *  EXCEL EXPORT (CSV)
+ * ═════════════════════════════════════════════════════════════ */
+function exportExcel() {
+  const data = state.filtered;
+  if(!data.length) { toast('내보낼 데이터가 없습니다','error'); return; }
+
+  const rows = [
+    ['시리얼번호','기종','수리항목','수리비용','등록일'],
+    ...data.map(e => [
+      e.serial,
+      e.model || '',
+      (e.works||[]).map(workName).join(' / '),
+      e.total,
+      fmt.date(e.date),
+    ]),
+  ];
+  const csv = '\uFEFF' + rows.map(r => r.map(v =>
+    `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob = new Blob([csv], { type:'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `AS_현황_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+  toast('CSV 파일로 내보냈습니다');
+}
+
+/* ═══════════════════════════════════════════════════════════════
+ *  EVENTS / INIT
+ * ═════════════════════════════════════════════════════════════ */
+function initFilters() {
+  // YYMM 옵션 자동 생성
+  const all = state.raw.entries || [];
+  const yymms = new Set();
+  all.forEach(e => { const y = extractYYMM(e.serial); if(y) yymms.add(y); });
+  const sel = document.getElementById('f-yymm');
+  sel.innerHTML = '<option value="all">전체</option>' +
+    Array.from(yymms).sort().reverse().map(y => `<option value="${y}">${y}</option>`).join('');
+}
+
+function bindEvents() {
+  // Sidebar / Tab navigation
+  document.querySelectorAll('.tab[data-tab], .sb-item[data-tab]').forEach(btn => {
+    btn.addEventListener('click', () => activateTab(btn.dataset.tab));
+  });
+
+  // Period chips
+  document.querySelectorAll('.chip[data-period]').forEach(c => {
+    c.addEventListener('click', () => {
+      document.querySelectorAll('.chip[data-period]').forEach(x => x.classList.remove('active'));
+      c.classList.add('active');
+      state.filter.period = c.dataset.period;
+      state.filter.dateFrom = ''; state.filter.dateTo = '';
+      document.getElementById('f-date-from').value = '';
+      document.getElementById('f-date-to').value = '';
+      refresh();
+    });
+  });
+  // Model chips
+  document.querySelectorAll('.chip[data-model]').forEach(c => {
+    c.addEventListener('click', () => {
+      document.querySelectorAll('.chip[data-model]').forEach(x => x.classList.remove('active'));
+      c.classList.add('active');
+      state.filter.model = c.dataset.model;
+      refresh();
+    });
+  });
+  // Alert chips
+  document.querySelectorAll('.chip[data-alert]').forEach(c => {
+    c.addEventListener('click', () => {
+      document.querySelectorAll('.chip[data-alert]').forEach(x => x.classList.remove('active'));
+      c.classList.add('active');
+      state.alertFilter = c.dataset.alert;
+      renderAlerts();
+    });
+  });
+
+  // Inputs
+  document.getElementById('f-yymm').addEventListener('change', e => { state.filter.yymm = e.target.value; refresh(); });
+  document.getElementById('f-worktype').addEventListener('change', e => { state.filter.worktype = e.target.value; refresh(); });
+  document.getElementById('f-serial').addEventListener('input', e => { state.filter.serial = e.target.value; });
+  document.getElementById('f-date-from').addEventListener('change', e => { state.filter.dateFrom = e.target.value; });
+  document.getElementById('f-date-to').addEventListener('change', e => { state.filter.dateTo = e.target.value; });
+
+  document.getElementById('btn-search').addEventListener('click', refresh);
+  document.getElementById('btn-reset').addEventListener('click', () => {
+    state.filter = { period:'all', dateFrom:'', dateTo:'', model:'all', yymm:'all', worktype:'all', serial:'' };
+    document.querySelectorAll('.chip[data-period]').forEach(c => c.classList.toggle('active', c.dataset.period === 'all'));
+    document.querySelectorAll('.chip[data-model]').forEach(c => c.classList.toggle('active', c.dataset.model === 'all'));
+    document.getElementById('f-yymm').value = 'all';
+    document.getElementById('f-worktype').value = 'all';
+    document.getElementById('f-serial').value = '';
+    document.getElementById('f-date-from').value = '';
+    document.getElementById('f-date-to').value = '';
+    refresh();
+  });
+
+  document.getElementById('btn-export').addEventListener('click', exportExcel);
+}
+
+/* 모든 차트/카드 리렌더 */
+function refresh() {
+  applyFilter();
+  // 모든 차트 destroy 후 다시 그리기 (탭이 활성화됐던 것만)
+  Object.keys(state.charts).forEach(k => destroyChart(k));
+  state.charts = {};
+  renderKPI();
+  renderDistribution();
+  renderMonthly();
+  renderYYMM();
+  renderCostStruct();
+  renderComplexity();
+  renderTopCauses();
+  generateAlerts();
+  // 현재 활성 탭이 dashboard 외라면 그것도 다시
+  const activeTab = document.querySelector('.tab.active')?.dataset.tab;
+  if(activeTab === 'analysis') { renderQuarter(); renderWorktype(); renderHeatmap(); renderAvgCost(); }
+  if(activeTab === 'shipping') renderShipping();
+  if(activeTab === 'cost') renderCost();
+  if(activeTab === 'alerts') renderAlerts();
+}
+
+async function init() {
+  document.getElementById('loading').style.display = 'flex';
+  document.querySelectorAll('.tab-pane').forEach(p => p.hidden = true);
+
+  try {
+    state.raw = await loadData();
+
+    // 업데이트 시간 표시
+    const now = new Date();
+    document.getElementById('last-update').textContent =
+      `${now.getFullYear()}. ${now.getMonth()+1}. ${now.getDate()}. ${now.getHours()<12?'오전':'오후'} ${(now.getHours()%12||12)}:${String(now.getMinutes()).padStart(2,'0')}`;
+
+    initFilters();
+    bindEvents();
+    refresh();
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('pane-dashboard').hidden = false;
+
+    if(DEMO_MODE) toast('DEMO 모드로 동작 중 — APPS_SCRIPT_URL을 설정하세요');
+  } catch(err) {
+    console.error(err);
+    document.getElementById('loading').innerHTML =
+      `<div style="color:var(--c-rose);text-align:center"><div style="font-weight:700;margin-bottom:6px">데이터 로드 실패</div><div style="font-size:12px">${err.message || err}</div></div>`;
+  }
+}
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
+
+</body>
+</html>
