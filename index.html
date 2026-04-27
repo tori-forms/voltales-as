@@ -1254,7 +1254,9 @@ function renderKPI() {
  *  RENDER: 대시보드 차트
  * ═════════════════════════════════════════════════════════════ */
 function destroyChart(key) {
-  if(state.charts[key]) { state.charts[key].destroy(); delete state.charts[key]; }
+  const c = state.charts[key];
+  if(c && typeof c.destroy === 'function') c.destroy();
+  delete state.charts[key];
 }
 
 const CHART_COLORS = {
