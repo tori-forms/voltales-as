@@ -1757,35 +1757,52 @@ function goShippingPage(n) {
  * ═════════════════════════════════════════════════════════════ */
 function renderCost() {
   const data = state.filtered;
-  const total = data.length;
+  const ps = (state.raw && state.raw.priceSettings) || {};
+  const modelPartsAll = ps.modelParts || {};
 
-  // 1) 논배터리 AS 비용 vs 새제품 (공임 + 부품비 합산)
-  const totalAS = data.reduce((s,e) => s + Number(e.total||0) + partsCost(e), 0);
-  const totalNew = total * NEW_UNIT_PRICE;
+  // ─── 비용 비교용 단가 (admin과 동일하게 하드코딩) ───
+  const TAECLAST = { pcb:72000, panel:65000, board:23000, wash:7000 };
+  const FORMS_LABOR = { pcb:15180, panel:10450, board:10450 };
+  const NONBAT_PRICE_PER = Number(ps.nonbat) || 18700;
+  const NEW_PRICE = Number(ps.newProduct) || NEW_UNIT_PRICE;
+
+  // 1) 논배터리 AS 비용 vs 새제품 (논배터리 작업 entry만, 논배터리 공임+부품)
+  const nonbatData = data.filter(e => (e.works||[]).includes('nonbat'));
+  const nonbatCount = nonbatData.length;
+  const totalAS = nonbatData.reduce((s, e) => {
+    const mp = modelPartsAll[e.model] || {};
+    const nbParts = Number(mp['nonbat']) || 0;
+    return s + NONBAT_PRICE_PER + nbParts;
+  }, 0);
+  const totalNew = nonbatCount * NEW_PRICE;
   const save = totalNew - totalAS;
   const savePct = totalNew > 0 ? (save/totalNew*100) : 0;
 
   document.getElementById('cost-as').innerHTML = fmt.num(totalAS) + '<span class="unit">원</span>';
-  document.getElementById('cost-as-sub').textContent = `${total}건 수리 · 1건당 ${fmt.num(Math.round(totalAS/Math.max(total,1)))}원`;
+  document.getElementById('cost-as-sub').textContent = `${nonbatCount}건 수리 · 1건당 ${fmt.num(Math.round(totalAS/Math.max(nonbatCount,1)))}원`;
   document.getElementById('cost-new').innerHTML = fmt.num(totalNew) + '<span class="unit">원</span>';
-  document.getElementById('cost-new-sub').textContent = `${total}개 × ${fmt.num(NEW_UNIT_PRICE)}원`;
+  document.getElementById('cost-new-sub').textContent = `${nonbatCount}개 × ${fmt.num(NEW_PRICE)}원`;
   document.getElementById('cost-save').innerHTML = fmt.num(save) + '<span class="unit">원</span>';
   document.getElementById('cost-save-pct').textContent = savePct.toFixed(0)+'% 절감';
 
   // 2) 업체별 수리비 비교 (PCB/LCD/MB만, 논배터리 제외)
-  const targetWorks = new Set(['pcb','panel','board']);
-  const targetData = data.filter(e => (e.works||[]).some(w => targetWorks.has(w)));
-  const venCount = targetData.length;
-
+  // 태블라스트 = 세척비(7000) + 작업단가, 폼즈 = FORMS_LABOR + 부품비(modelParts)
   let estimated = 0;
   let actual = 0;
-  targetData.forEach(e => {
-    (e.works||[]).forEach(w => {
-      if(w === 'pcb') estimated += 72000;
-      else if(w === 'panel') estimated += 65000;
-      else if(w === 'board') estimated += 23000;
-    });
-    actual += Number(e.total||0) + partsCost(e);
+  let venCount = 0;
+  data.forEach(e => {
+    const ws = new Set(e.works || []);
+    const hasCompWork = ws.has('pcb') || ws.has('panel') || ws.has('board');
+    if(!hasCompWork) return;
+    venCount++;
+    const mp = modelPartsAll[e.model] || {};
+    let taec = TAECLAST.wash; // 세척비 (타사 작업 있는 건에만)
+    let forms = 0;
+    if(ws.has('pcb'))   { taec += TAECLAST.pcb;   forms += FORMS_LABOR.pcb   + (Number(mp.pcb)||0); }
+    if(ws.has('panel')) { taec += TAECLAST.panel; forms += FORMS_LABOR.panel + (Number(mp.panel)||0); }
+    if(ws.has('board')) { taec += TAECLAST.board; forms += FORMS_LABOR.board + (Number(mp.board)||0); }
+    estimated += taec;
+    actual    += forms;
   });
   const venSave = estimated - actual;
   const venSavePct = estimated > 0 ? (venSave/estimated*100) : 0;
@@ -1797,24 +1814,14 @@ function renderCost() {
   document.getElementById('ven-save').innerHTML = fmt.num(venSave) + '<span class="unit">원</span>';
   document.getElementById('ven-save-pct').textContent = venCount > 0 ? `${venSavePct.toFixed(0)}% 저렴 · 건당 ${fmt.num(Math.round(venSave/Math.max(venCount,1)))}원 절감` : '데이터 없음';
 
-  // 항목별 차트
+  // 항목별 차트 (PCB / LCD / MB 각각의 평균 단가)
   const buckets = { 'PCB 교체':{e:0,a:0,c:0}, 'LCD 교체':{e:0,a:0,c:0}, 'M/B 수리':{e:0,a:0,c:0} };
   data.forEach(e => {
-    const works = (e.works||[]);
-    const wlen = works.length || 1;
-    // 항목별 평균 비용 = (공임비 + 부품비) / 수리항목 수
-    const per = (Number(e.total||0) + partsCost(e)) / wlen;
-    works.forEach(w => {
-      let key = null, est = 0;
-      if(w === 'pcb') { key = 'PCB 교체'; est = 72000; }
-      else if(w === 'panel') { key = 'LCD 교체'; est = 65000; }
-      else if(w === 'board') { key = 'M/B 수리'; est = 23000; }
-      if(key) {
-        buckets[key].e += est;
-        buckets[key].a += per;
-        buckets[key].c++;
-      }
-    });
+    const ws = new Set(e.works||[]);
+    const mp = modelPartsAll[e.model] || {};
+    if(ws.has('pcb'))   { buckets['PCB 교체'].e += TAECLAST.pcb;   buckets['PCB 교체'].a += FORMS_LABOR.pcb   + (Number(mp.pcb)||0);   buckets['PCB 교체'].c++; }
+    if(ws.has('panel')) { buckets['LCD 교체'].e += TAECLAST.panel; buckets['LCD 교체'].a += FORMS_LABOR.panel + (Number(mp.panel)||0); buckets['LCD 교체'].c++; }
+    if(ws.has('board')) { buckets['M/B 수리'].e += TAECLAST.board; buckets['M/B 수리'].a += FORMS_LABOR.board + (Number(mp.board)||0); buckets['M/B 수리'].c++; }
   });
   const labels = Object.keys(buckets);
   const estData = labels.map(k => buckets[k].c > 0 ? Math.round(buckets[k].e/buckets[k].c) : 0);
