@@ -189,7 +189,6 @@ a{color:inherit;text-decoration:none}
   background:var(--primary);color:#fff;font-weight:600;font-size:12.5px;
   padding:7px 14px;border-radius:8px;
   display:flex;align-items:center;gap:5px;
-  margin-left:auto;
   transition:background .12s;
 }
 .btn-search:hover{background:var(--primary-2)}
@@ -201,7 +200,7 @@ a{color:inherit;text-decoration:none}
   transition:background .12s;
 }
 .btn-reset:hover{background:#f8fafc}
-.filter-actions{display:flex;flex-direction:column;gap:6px;margin-left:auto;align-items:flex-end}
+.filter-actions{display:flex;flex-direction:row;gap:8px;margin-left:auto;align-items:center;flex-shrink:0}
 
 /* Tabs */
 .tabs{
@@ -809,9 +808,8 @@ table.data tr:hover td{background:#fafbfc}
                 <th>시리얼번호</th>
                 <th>기종</th>
                 <th>수리항목</th>
-                <th>마감일</th>
                 <th>출고일</th>
-                <th>에이징</th>
+                <th>처리일</th>
                 <th>상태</th>
               </tr>
             </thead>
@@ -914,8 +912,8 @@ const VENDOR_PRICE = {
 };
 /* 새제품 단가 */
 const NEW_UNIT_PRICE = 140000;
-/* SLA 기준 (수리 등록일 기점, 일 단위) */
-const SLA_DAYS = 7;
+/* 미출고 알림 기준 (등록 후 N일 이상 미출고시 알림) */
+const STALE_DAYS = 14;
 
 /* ═══════════════════════════════════════════════════════════════
  *  STATE
@@ -1229,8 +1227,6 @@ function renderKPI() {
     })
     .filter(x => x !== null);
   const avgLead = leadTimes.length ? leadTimes.reduce((a,b)=>a+b,0)/leadTimes.length : 0;
-  const slaOk = leadTimes.filter(d => d <= SLA_DAYS).length;
-  const slaPct = leadTimes.length ? (slaOk/leadTimes.length*100) : 0;
 
   // 재발 수리율: 같은 시리얼 2번 이상
   const serialCount = {};
@@ -1243,7 +1239,7 @@ function renderKPI() {
     {label:'총 매출액',   val:fmt.num(sumTotal), unit:'원', color:'green', icon:'won',   foot:`전월 대비 <span class="up">▲ 8.3%</span>`},
     {label:'평균 수리비용', val:fmt.num(Math.round(avgTotal)), unit:'원', color:'amber', icon:'calc', foot:'건당 평균'},
     {label:'복합수리 비율', val:multiPct.toFixed(0), unit:'%', color:'purple', icon:'layers', foot:`${multi}건 / ${total}건`},
-    {label:'평균 처리 리드타임', val:avgLead.toFixed(1), unit:'일', color:'cyan', icon:'clock', foot:`SLA 준수율 ${slaPct.toFixed(0)}%`},
+    {label:'평균 처리 리드타임', val:avgLead.toFixed(1), unit:'일', color:'cyan', icon:'clock', foot:'등록~출고 평균'},
     {label:'재발 수리율', val:repeatPct.toFixed(1), unit:'%', color:'rose', icon:'refresh', foot:`${repeats}건 재입고 <span class="down">▼ 1.2%p</span>`},
   ];
 
@@ -1626,38 +1622,33 @@ function renderShipping() {
   const shippedSerials = new Set(ship.map(s => s.serial));
   const pending = entries.filter(e => !shippedSerials.has(e.serial));
 
-  // 마감일 = 등록일 + 4일 (가정)
   const rows = [];
   ship.forEach((s, idx) => {
     const e = entryMap.get(s.serial);
     const repairDate = e ? new Date(e.date) : null;
     const shipDate = s.shipDate ? new Date(s.shipDate) : null;
-    const deadline = repairDate ? new Date(repairDate.getTime() + SLA_DAYS*86400000) : null;
-    const aging = (repairDate && shipDate) ? Math.max(0.1, (shipDate-repairDate)/(1000*60*60)) : null;
-    let status = '출고완료';
-    if(shipDate && deadline && shipDate > deadline) status = '출고지연';
+    // 처리일 = 등록일~출고일 간격 (일 단위)
+    const processDays = (repairDate && shipDate)
+      ? Math.max(0.1, (shipDate - repairDate) / 86400000)
+      : null;
     rows.push({
       no: idx+1,
       serial: s.serial,
       model: s.model || (e?.model || '-'),
       works: s.works || ((e?.works||[]).map(workName).join(' / ')),
-      deadline: deadline ? fmt.date(deadline) : '-',
       shipDate: s.shipDate || '-',
-      aging,
-      status,
+      processDays,
+      status: '출고완료',
     });
   });
   pending.forEach((e) => {
-    const repairDate = new Date(e.date);
-    const deadline = new Date(repairDate.getTime() + SLA_DAYS*86400000);
     rows.push({
       no: rows.length + 1,
       serial: e.serial,
       model: e.model,
       works: (e.works||[]).map(workName).join(' / '),
-      deadline: fmt.date(deadline),
       shipDate: '-',
-      aging: null,
+      processDays: null,
       status: '출고대기',
     });
   });
@@ -1665,9 +1656,8 @@ function renderShipping() {
   // 통계
   const done = rows.filter(r => r.status === '출고완료').length;
   const wait = rows.filter(r => r.status === '출고대기').length;
-  const delay = rows.filter(r => r.status === '출고지연').length;
-  const agings = rows.filter(r => r.aging !== null).map(r => r.aging);
-  const avgAge = agings.length ? agings.reduce((a,b)=>a+b,0)/agings.length : 0;
+  const processList = rows.filter(r => r.processDays !== null).map(r => r.processDays);
+  const avgProcess = processList.length ? processList.reduce((a,b)=>a+b,0)/processList.length : 0;
 
   document.getElementById('ship-kpi').innerHTML = `
     <div class="card" style="padding:14px 16px">
@@ -1679,12 +1669,8 @@ function renderShipping() {
       <div style="font-size:22px;font-weight:700;letter-spacing:-.02em">${fmt.num(wait)}<span style="font-size:13px;color:var(--text-2);margin-left:2px">건</span></div>
     </div>
     <div class="card" style="padding:14px 16px">
-      <div style="font-size:12px;color:var(--text-3);font-weight:600;margin-bottom:6px">평균 에이징</div>
-      <div style="font-size:22px;font-weight:700;letter-spacing:-.02em">${avgAge.toFixed(1)}<span style="font-size:13px;color:var(--text-2);margin-left:2px">시간</span></div>
-    </div>
-    <div class="card" style="padding:14px 16px">
-      <div style="font-size:12px;color:var(--text-3);font-weight:600;margin-bottom:6px">출고 지연</div>
-      <div style="font-size:22px;font-weight:700;letter-spacing:-.02em;color:${delay>0?'var(--c-rose)':'var(--text)'}">${fmt.num(delay)}<span style="font-size:13px;color:var(--text-2);margin-left:2px">건</span></div>
+      <div style="font-size:12px;color:var(--text-3);font-weight:600;margin-bottom:6px">평균 처리일</div>
+      <div style="font-size:22px;font-weight:700;letter-spacing:-.02em">${avgProcess.toFixed(1)}<span style="font-size:13px;color:var(--text-2);margin-left:2px">일</span></div>
     </div>
   `;
 
@@ -1699,21 +1685,18 @@ function renderShipping() {
   const rowsToShow = rows.slice(startIdx, startIdx + pageSize);
 
   tbody.innerHTML = rowsToShow.map(r => {
-    let tagClass = 'done';
-    if(r.status === '출고대기') tagClass = 'wait';
-    if(r.status === '출고지연') tagClass = 'delay';
+    let tagClass = r.status === '출고대기' ? 'wait' : 'done';
     return `
       <tr>
         <td>${r.no}</td>
         <td style="font-family:monospace;font-size:12.5px">${r.serial}</td>
         <td>${r.model}</td>
         <td>${r.works}</td>
-        <td>${r.deadline}</td>
         <td>${r.shipDate}</td>
-        <td>${r.aging !== null ? r.aging.toFixed(1)+'시간' : '-'}</td>
+        <td>${r.processDays !== null ? r.processDays.toFixed(1)+'일' : '-'}</td>
         <td><span class="tag ${tagClass}">${r.status}</span></td>
       </tr>`;
-  }).join('') || '<tr><td colspan="8"><div class="empty">데이터가 없습니다</div></td></tr>';
+  }).join('') || '<tr><td colspan="7"><div class="empty">데이터가 없습니다</div></td></tr>';
 
   // 페이지네이션 컨트롤 렌더
   const pgEl = document.getElementById('ship-pagination');
@@ -1890,23 +1873,23 @@ function generateAlerts() {
     return `${mo}개월 전`;
   };
 
-  // ── 1) SLA 초과 위험 (수리 등록일 기점 SLA_DAYS 초과 + 미출고) ──
+  // ── 1) 14일 이상 미출고 (등록 후 STALE_DAYS 초과 + 미출고) ──
   const shippedSerials = new Set(ship.map(s => s.serial));
   const pending = data.filter(e => !shippedSerials.has(e.serial));
-  const overdue = pending.filter(e => {
+  const stale = pending.filter(e => {
     const repairDate = new Date(e.date);
-    const deadline = new Date(repairDate.getTime() + SLA_DAYS*86400000);
+    const deadline = new Date(repairDate.getTime() + STALE_DAYS*86400000);
     return now > deadline;
   }).sort((a,b) => new Date(a.date) - new Date(b.date)); // 오래된 순
 
-  if(overdue.length > 0) {
-    const sample = overdue.slice(0,2).map(e => e.serial).join(', ');
-    const oldest = new Date(overdue[0].date);
-    const daysOverdue = Math.floor((now - oldest) / 86400000) - SLA_DAYS;
+  if(stale.length > 0) {
+    const sample = stale.slice(0,2).map(e => e.serial).join(', ');
+    const oldest = new Date(stale[0].date);
+    const daysSince = Math.floor((now - oldest) / 86400000);
     alerts.push({
       kind:'urgent', icon:'!',
-      title:`SLA 초과 위험 — ${overdue.length}건 처리 지연`,
-      msg:`등록 후 ${SLA_DAYS}일 초과 미출고: ${sample}${overdue.length>2?` 외 ${overdue.length-2}건`:''} · 가장 오래된 건은 ${daysOverdue}일 초과`,
+      title:`${STALE_DAYS}일 이상 미출고 — ${stale.length}건`,
+      msg:`등록 후 ${STALE_DAYS}일 넘게 미출고: ${sample}${stale.length>2?` 외 ${stale.length-2}건`:''} · 가장 오래된 건은 ${daysSince}일 경과 · 누락 여부 확인 필요`,
       time: relTime(oldest) + ' 등록',
     });
   }
