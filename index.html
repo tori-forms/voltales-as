@@ -1015,13 +1015,15 @@ function getWeekOfMonth(d) {
   return Math.min(4, Math.ceil(dt.getDate()/7));
 }
 
-/* 부품가 합계 (parts JSON) — 시안에는 단가설정이 있지만 클라이언트엔 노출 안 됨 */
-function partsCost(parts) {
-  if(!parts) return 0;
-  try {
-    const obj = typeof parts === 'string' ? JSON.parse(parts) : parts;
-    return Object.values(obj).reduce((s,v) => s + (Number(v)||0), 0);
-  } catch { return 0; }
+/* 부품비 계산: entry의 model + works를 priceSettings.modelParts에서 lookup
+   admin '단가설정' 시트의 modelParts 구조: { 'S2PRO_N': { pcb: 62000, panel: ..., board: ..., nonbat: ... }, 'S2_N': {...} } */
+function partsCost(entry) {
+  if(!entry) return 0;
+  const ps = (state.raw && state.raw.priceSettings) || {};
+  const modelParts = ps.modelParts || {};
+  const modelPrice = modelParts[entry.model];
+  if(!modelPrice) return 0;
+  return (entry.works || []).reduce((sum, w) => sum + (Number(modelPrice[w]) || 0), 0);
 }
 
 /* 수리항목 한글 이름 매핑 */
@@ -1236,7 +1238,7 @@ function renderKPI() {
   const data = state.filtered;
   const total = data.length;
   // 매출/수리비 = 공임비(e.total) + 부품비(partsCost)
-  const sumTotal = data.reduce((s,e) => s + Number(e.total||0) + partsCost(e.parts), 0);
+  const sumTotal = data.reduce((s,e) => s + Number(e.total||0) + partsCost(e), 0);
   const avgTotal = total ? sumTotal/total : 0;
   const multi = data.filter(e => (e.works||[]).length >= 2).length;
   const multiPct = total ? (multi/total*100) : 0;
@@ -1428,7 +1430,7 @@ function renderCostStruct() {
   let totalRevenue = 0, totalParts = 0;
   state.filtered.forEach(e => {
     totalRevenue += Number(e.total||0);
-    totalParts += partsCost(e.parts);
+    totalParts += partsCost(e);
   });
   const labor = Math.max(0, totalRevenue - totalParts);
   const totalMan = Math.round(totalRevenue/10000);
@@ -1758,7 +1760,7 @@ function renderCost() {
   const total = data.length;
 
   // 1) 논배터리 AS 비용 vs 새제품 (공임 + 부품비 합산)
-  const totalAS = data.reduce((s,e) => s + Number(e.total||0) + partsCost(e.parts), 0);
+  const totalAS = data.reduce((s,e) => s + Number(e.total||0) + partsCost(e), 0);
   const totalNew = total * NEW_UNIT_PRICE;
   const save = totalNew - totalAS;
   const savePct = totalNew > 0 ? (save/totalNew*100) : 0;
@@ -1783,7 +1785,7 @@ function renderCost() {
       else if(w === 'panel') estimated += 65000;
       else if(w === 'board') estimated += 23000;
     });
-    actual += Number(e.total||0) + partsCost(e.parts);
+    actual += Number(e.total||0) + partsCost(e);
   });
   const venSave = estimated - actual;
   const venSavePct = estimated > 0 ? (venSave/estimated*100) : 0;
@@ -1801,7 +1803,7 @@ function renderCost() {
     const works = (e.works||[]);
     const wlen = works.length || 1;
     // 항목별 평균 비용 = (공임비 + 부품비) / 수리항목 수
-    const per = (Number(e.total||0) + partsCost(e.parts)) / wlen;
+    const per = (Number(e.total||0) + partsCost(e)) / wlen;
     works.forEach(w => {
       let key = null, est = 0;
       if(w === 'pcb') { key = 'PCB 교체'; est = 72000; }
