@@ -51,6 +51,31 @@
   --radius-lg:16px;
 }
 
+/* 다크 모드 — 사이드바는 그대로 어두운 색 유지, 메인 영역만 다크화 */
+:root[data-theme="dark"]{
+  --bg:#0b1220;
+  --surface:#111827;
+  --border:#1f2937;
+  --border-strong:#334155;
+  --text:#f1f5f9;
+  --text-2:#cbd5e1;
+  --text-3:#94a3b8;
+  --primary-soft:rgba(59,130,246,.18);
+  --shadow-sm:0 1px 2px 0 rgb(0 0 0 / .3), 0 1px 1px 0 rgb(0 0 0 / .2);
+  --shadow:0 1px 3px 0 rgb(0 0 0 / .35), 0 1px 2px -1px rgb(0 0 0 / .25);
+  --shadow-md:0 4px 6px -1px rgb(0 0 0 / .4), 0 2px 4px -2px rgb(0 0 0 / .3);
+}
+:root[data-theme="dark"] .filter-group{background:var(--surface)}
+:root[data-theme="dark"] .filter-group input[type="date"],
+:root[data-theme="dark"] .filter-group select,
+:root[data-theme="dark"] .filter-group input[type="text"]{color:var(--text)}
+:root[data-theme="dark"] .btn-reset{background:var(--surface);color:var(--text-2)}
+:root[data-theme="dark"] .btn-reset:hover{background:#1f2937}
+:root[data-theme="dark"] .pg-btn{background:var(--surface);color:var(--text-2)}
+:root[data-theme="dark"] .pg-btn:hover:not(:disabled){background:var(--primary-soft);color:#93c5fd}
+:root[data-theme="dark"] table thead{background:#0f172a}
+:root[data-theme="dark"] input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(.8)}
+
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%}
 body{
@@ -1210,7 +1235,8 @@ function applyFilter() {
 function renderKPI() {
   const data = state.filtered;
   const total = data.length;
-  const sumTotal = data.reduce((s,e) => s + Number(e.total||0), 0);
+  // 매출/수리비 = 공임비(e.total) + 부품비(partsCost)
+  const sumTotal = data.reduce((s,e) => s + Number(e.total||0) + partsCost(e.parts), 0);
   const avgTotal = total ? sumTotal/total : 0;
   const multi = data.filter(e => (e.works||[]).length >= 2).length;
   const multiPct = total ? (multi/total*100) : 0;
@@ -1235,12 +1261,12 @@ function renderKPI() {
   const repeatPct = total ? (repeats/total*100) : 0;
 
   const kpis = [
-    {label:'총 작업 수량', val:fmt.num(total), unit:'건', color:'slate', icon:'wrench', foot:`전월 대비 <span class="up">▲ 12.6%</span>`},
-    {label:'총 매출액',   val:fmt.num(sumTotal), unit:'원', color:'green', icon:'won',   foot:`전월 대비 <span class="up">▲ 8.3%</span>`},
-    {label:'평균 수리비용', val:fmt.num(Math.round(avgTotal)), unit:'원', color:'amber', icon:'calc', foot:'건당 평균'},
+    {label:'총 작업 수량', val:fmt.num(total), unit:'건', color:'slate', icon:'wrench', foot:'필터 적용 기준'},
+    {label:'총 매출액',   val:fmt.num(sumTotal), unit:'원', color:'green', icon:'won',   foot:'공임비 + 부품비'},
+    {label:'평균 수리비용', val:fmt.num(Math.round(avgTotal)), unit:'원', color:'amber', icon:'calc', foot:'건당 (공임 + 부품)'},
     {label:'복합수리 비율', val:multiPct.toFixed(0), unit:'%', color:'purple', icon:'layers', foot:`${multi}건 / ${total}건`},
-    {label:'평균 처리 리드타임', val:avgLead.toFixed(1), unit:'일', color:'cyan', icon:'clock', foot:'등록~출고 평균'},
-    {label:'재발 수리율', val:repeatPct.toFixed(1), unit:'%', color:'rose', icon:'refresh', foot:`${repeats}건 재입고 <span class="down">▼ 1.2%p</span>`},
+    {label:'평균 처리 리드타임', val:avgLead.toFixed(1), unit:'일', color:'cyan', icon:'clock', foot:'수리등록 ~ 출고 소요일'},
+    {label:'재발 수리율', val:repeatPct.toFixed(1), unit:'%', color:'rose', icon:'refresh', foot:`${repeats}건 재입고`},
   ];
 
   const ICONS = {
@@ -1731,8 +1757,8 @@ function renderCost() {
   const data = state.filtered;
   const total = data.length;
 
-  // 1) 논배터리 AS 비용 vs 새제품
-  const totalAS = data.reduce((s,e) => s + Number(e.total||0), 0);
+  // 1) 논배터리 AS 비용 vs 새제품 (공임 + 부품비 합산)
+  const totalAS = data.reduce((s,e) => s + Number(e.total||0) + partsCost(e.parts), 0);
   const totalNew = total * NEW_UNIT_PRICE;
   const save = totalNew - totalAS;
   const savePct = totalNew > 0 ? (save/totalNew*100) : 0;
@@ -1757,7 +1783,7 @@ function renderCost() {
       else if(w === 'panel') estimated += 65000;
       else if(w === 'board') estimated += 23000;
     });
-    actual += Number(e.total||0);
+    actual += Number(e.total||0) + partsCost(e.parts);
   });
   const venSave = estimated - actual;
   const venSavePct = estimated > 0 ? (venSave/estimated*100) : 0;
@@ -1774,7 +1800,8 @@ function renderCost() {
   data.forEach(e => {
     const works = (e.works||[]);
     const wlen = works.length || 1;
-    const per = e.total / wlen;
+    // 항목별 평균 비용 = (공임비 + 부품비) / 수리항목 수
+    const per = (Number(e.total||0) + partsCost(e.parts)) / wlen;
     works.forEach(w => {
       let key = null, est = 0;
       if(w === 'pcb') { key = 'PCB 교체'; est = 72000; }
@@ -2140,7 +2167,41 @@ function bindEvents() {
   });
 
   document.getElementById('btn-export').addEventListener('click', exportExcel);
+
+  // ── 라이트/다크 모드 토글 ──
+  document.getElementById('theme-toggle').addEventListener('click', () => {
+    const cur = document.documentElement.getAttribute('data-theme') || 'light';
+    const next = cur === 'light' ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', next);
+    try { localStorage.setItem('voltales-theme', next); } catch(e) {}
+    updateThemeButton();
+    // 차트 재렌더 (축/그리드 색상 다시 잡기 위해)
+    refresh();
+  });
 }
+
+function updateThemeButton() {
+  const cur = document.documentElement.getAttribute('data-theme') || 'light';
+  const btn = document.getElementById('theme-toggle');
+  if(!btn) return;
+  const span = btn.querySelector('span');
+  if(span) span.textContent = cur === 'dark' ? '라이트 모드' : '다크 모드';
+  // 아이콘도 살짝 바꾸기 (해 ↔ 달)
+  const svg = btn.querySelector('svg');
+  if(svg) {
+    svg.innerHTML = cur === 'dark'
+      ? '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>'
+      : '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>';
+  }
+}
+
+// 페이지 로드 시 저장된 테마 즉시 적용 (FOUC 방지)
+(function() {
+  try {
+    const saved = localStorage.getItem('voltales-theme');
+    if(saved === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+  } catch(e) {}
+})();
 
 /* 모든 차트/카드 리렌더 */
 function refresh() {
@@ -2166,6 +2227,7 @@ function refresh() {
 }
 
 async function init() {
+  updateThemeButton(); // 저장된 테마에 따라 버튼 라벨/아이콘 초기화
   document.getElementById('loading').style.display = 'flex';
   document.querySelectorAll('.tab-pane').forEach(p => p.hidden = true);
 
