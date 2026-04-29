@@ -809,6 +809,7 @@ table.data tr:hover td{background:#fafbfc}
         </div>
       </div>
 
+
     </div>
 
     <!-- ════════ Tab: Shipping ════════ -->
@@ -1011,12 +1012,11 @@ function getWeekOfMonth(d) {
 }
 
 /* 부품비 계산 — 두 함수로 분리
-   - partsValue(entry):  실제 부품 가치 (절감액·비교·실제 가치 표시용, 항상 양수)
-   - partsBilled(entry): 청구 대상 부품비 (현재는 0, 미래 자비 구매분만 합산)
-   2026-04-29 기준 정책: 모든 부품 = 티오더 사전 지급분 → partsBilled = 0
-   향후 자비 구매 발생 시: 재고 시스템의 'source' 필드 기반 FIFO 분리 → partsBilled 정교화 */
+   - partsValue(entry):  실제 부품 가치 (절감액·비교 산정용)
+   - partsBilled(entry): 청구 대상 부품비 (현재 정책 0원, 미래 자비분만)
+   2026-04-29 정책: 모든 부품 = 티오더 사전 지급분 → partsBilled = 0
+   미래 자비 구매 시: 재고 시트 'source' 필드 기반 FIFO 분리 활성화 */
 function partsValue(entry) {
-  // 실제 부품 가치 (모델별 단가 합산) — 청구 여부와 무관
   if(!entry) return 0;
   const ps = (state.raw && state.raw.priceSettings) || {};
   const modelParts = ps.modelParts || {};
@@ -1025,13 +1025,9 @@ function partsValue(entry) {
   return (entry.works || []).reduce((sum, w) => sum + (Number(modelPrice[w]) || 0), 0);
 }
 function partsBilled(entry) {
-  // 청구 대상 부품비 (현재 정책: 0원, 미래 자비 구매분 발생 시 분리 산정)
   return 0;
 }
-// 하위호환: 기존 partsCost 호출 → 청구액 기준 (= partsBilled)
-function partsCost(entry) {
-  return partsBilled(entry);
-}
+function partsCost(entry) { return partsBilled(entry); }
 
 /* 수리항목 한글 이름 매핑 */
 const WORK_KO = {
@@ -1244,14 +1240,11 @@ function applyFilter() {
 function renderKPI() {
   const data = state.filtered;
   const total = data.length;
-  // 매출/수리비 = 공임비(e.total) + 부품비(partsCost)
-  // 작업 가치 = 공임 + 부품 실제 가치 (절감액 산정 + 비교용)
+  // 작업 가치 = 공임 + 부품 실제 가치 (절감액·비교 산정용)
   const sumValue = data.reduce((s,e) => s + Number(e.total||0) + partsValue(e), 0);
-  // 청구 대상 = 공임 + 청구 부품비 (현재 정책에선 청구 부품비 = 0)
+  // 청구 대상 = 공임 + 청구 부품비 (현 정책: 청구 부품비 0)
   const sumBilled = data.reduce((s,e) => s + Number(e.total||0) + partsBilled(e), 0);
-  // 평균값
-  const avgValue = total ? sumValue/total : 0;
-  // (avgValue로 대체됨)
+  const avgBilled = total ? sumBilled/total : 0;
   const multi = data.filter(e => (e.works||[]).length >= 2).length;
   const multiPct = total ? (multi/total*100) : 0;
 
@@ -1273,9 +1266,6 @@ function renderKPI() {
   data.forEach(e => serialCount[e.serial] = (serialCount[e.serial]||0) + 1);
   const repeats = Object.values(serialCount).filter(c => c >= 2).length;
   const repeatPct = total ? (repeats/total*100) : 0;
-
-  // 평균 청구액 (건당)
-  const avgBilled = total ? sumBilled/total : 0;
 
   const kpis = [
     {label:'총 작업 수량', val:fmt.num(total), unit:'건', color:'slate', icon:'wrench', foot:'필터 적용 기준'},
@@ -1375,7 +1365,7 @@ function renderMonthly() {
   state.filtered.forEach(e => {
     const ym = fmt.ym(e.date);
     if(!buckets[ym]) buckets[ym] = { sum:0, cnt:0 };
-    // 월별 매출 = 공임 + 부품 실제 가치 (절감액 산정과 동일 정의)
+    // 월별 매출 = 공임 + 부품 실제 가치
     buckets[ym].sum += Number(e.total||0) + partsValue(e);
     buckets[ym].cnt += 1;
   });
@@ -1446,7 +1436,7 @@ function renderCostStruct() {
   let totalLabor = 0, totalParts = 0;
   state.filtered.forEach(e => {
     totalLabor += Number(e.total||0);     // 공임
-    totalParts += partsValue(e);          // 부품 실제 가치 (청구 여부와 무관)
+    totalParts += partsValue(e);          // 부품 실제 가치
   });
   const grandTotal = totalLabor + totalParts;
   const totalMan = Math.round(grandTotal/10000);
@@ -1746,7 +1736,6 @@ function renderCost() {
   // 1) 논배터리 AS 비용 vs 새제품 (논배터리 작업 entry만, 논배터리 공임+부품)
   const nonbatData = data.filter(e => (e.works||[]).includes('nonbat'));
   const nonbatCount = nonbatData.length;
-  // 논배터리 AS 비용 = 공임 + 부품 (실제 가치, 새제품 대비 비교용)
   const totalAS = nonbatData.reduce((s, e) => {
     const mp = modelPartsAll[e.model] || {};
     const nbParts = Number(mp['nonbat']) || 0;
@@ -1776,7 +1765,6 @@ function renderCost() {
     const mp = modelPartsAll[e.model] || {};
     let taec = TAECLAST.wash; // 세척비 (타사 작업 있는 건에만)
     let forms = 0;
-    // 비교 대상: 모두 실제 가치 기준 (태클라스트는 부품+공임 통합단가, 폼즈도 공임+부품)
     if(ws.has('pcb'))   { taec += TAECLAST.pcb;   forms += FORMS_LABOR.pcb   + (Number(mp.pcb)||0); }
     if(ws.has('panel')) { taec += TAECLAST.panel; forms += FORMS_LABOR.panel + (Number(mp.panel)||0); }
     if(ws.has('board')) { taec += TAECLAST.board; forms += FORMS_LABOR.board + (Number(mp.board)||0); }
@@ -1789,7 +1777,7 @@ function renderCost() {
   document.getElementById('ven-count').textContent = venCount;
   document.getElementById('ven-est').innerHTML = fmt.num(estimated) + '<span class="unit">원</span>';
   document.getElementById('ven-actual').innerHTML = fmt.num(actual) + '<span class="unit">원</span>';
-  document.getElementById('ven-actual-sub').textContent = `공임 + 부품 · 건당 ${fmt.num(Math.round(actual/Math.max(venCount,1)))}원`;
+  document.getElementById('ven-actual-sub').textContent = `공임비 + 부품비 · 건당 ${fmt.num(Math.round(actual/Math.max(venCount,1)))}원`;
   document.getElementById('ven-save').innerHTML = fmt.num(venSave) + '<span class="unit">원</span>';
   document.getElementById('ven-save-pct').textContent = venCount > 0 ? `${venSavePct.toFixed(0)}% 저렴 · 건당 ${fmt.num(Math.round(venSave/Math.max(venCount,1)))}원 절감` : '데이터 없음';
 
@@ -1798,7 +1786,7 @@ function renderCost() {
   data.forEach(e => {
     const ws = new Set(e.works||[]);
     const mp = modelPartsAll[e.model] || {};
-    // 항목별 평균 단가 — 실제 가치 기준 (양쪽 모두 부품비 포함, 태클라스트는 세척비 7,000원 추가)
+    // 항목별 평균 단가 — 태클라스트는 작업당 세척비 7,000원 추가, 양쪽 모두 부품비 포함
     if(ws.has('pcb'))   { buckets['PCB 교체'].e += TAECLAST.pcb   + TAECLAST.wash; buckets['PCB 교체'].a += FORMS_LABOR.pcb   + (Number(mp.pcb)||0);   buckets['PCB 교체'].c++; }
     if(ws.has('panel')) { buckets['LCD 교체'].e += TAECLAST.panel + TAECLAST.wash; buckets['LCD 교체'].a += FORMS_LABOR.panel + (Number(mp.panel)||0); buckets['LCD 교체'].c++; }
     if(ws.has('board')) { buckets['MB수리'].e += TAECLAST.board   + TAECLAST.wash; buckets['MB수리'].a += FORMS_LABOR.board   + (Number(mp.board)||0); buckets['MB수리'].c++; }
@@ -1838,7 +1826,7 @@ function renderCost() {
     const mp = modelPartsAll[e.model] || {};
     let saveThis = 0;
 
-    // (1) 논배터리 절감: 새제품 가격 - 논배터리 작업 실제 가치 (공임 + 부품)
+    // (1) 논배터리 절감: 새제품 가격 - (공임 + 부품비)
     if(ws.has('nonbat')) {
       const nbCost = NONBAT_PRICE_PER + (Number(mp.nonbat) || 0);
       saveThis += (NEW_PRICE - nbCost);
@@ -1849,7 +1837,6 @@ function renderCost() {
     if(hasComp) {
       let taec = TAECLAST.wash;
       let forms = 0;
-      // 업체별 비교 절감 - 실제 가치 기준 (태클라스트 vs 폼즈, 양쪽 모두 부품비 포함)
       if(ws.has('pcb'))   { taec += TAECLAST.pcb;   forms += FORMS_LABOR.pcb   + (Number(mp.pcb)||0); }
       if(ws.has('panel')) { taec += TAECLAST.panel; forms += FORMS_LABOR.panel + (Number(mp.panel)||0); }
       if(ws.has('board')) { taec += TAECLAST.board; forms += FORMS_LABOR.board + (Number(mp.board)||0); }
@@ -2074,7 +2061,7 @@ function activateTab(name) {
   if(name === 'shipping' && !state.charts._shipDone) { renderShipping(); state.charts._shipDone = true; }
   if(name === 'cost' && !state.charts.vendor) renderCost();
   if(name === 'analysis' && !state.charts.quarter) {
-    renderQuarter(); renderWorktype(); renderHeatmap(); // renderAvgCost() 제거됨 (2026-04-29)
+    renderQuarter(); renderWorktype(); renderHeatmap();
   }
   if(name === 'alerts') renderAlerts();
 }
@@ -2232,7 +2219,7 @@ function refresh() {
   generateAlerts();
   // 현재 활성 탭이 dashboard 외라면 그것도 다시
   const activeTab = document.querySelector('.tab.active')?.dataset.tab;
-  if(activeTab === 'analysis') { renderQuarter(); renderWorktype(); renderHeatmap(); // renderAvgCost() 제거됨 (2026-04-29) }
+  if(activeTab === 'analysis') { renderQuarter(); renderWorktype(); renderHeatmap(); }
   if(activeTab === 'shipping') renderShipping();
   if(activeTab === 'cost') renderCost();
   if(activeTab === 'alerts') renderAlerts();
