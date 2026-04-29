@@ -809,13 +809,6 @@ table.data tr:hover td{background:#fafbfc}
         </div>
       </div>
 
-      <div class="card">
-        <div class="card-title">
-          <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m17 3 4 4-4 4"/><path d="M3 7h18"/><path d="m7 21-4-4 4-4"/><path d="M21 17H3"/></svg>
-          수리 항목별 평균 비용 비교
-        </div>
-        <div class="chart-wrap" style="height:300px"><canvas id="chart-avg-cost"></canvas></div>
-      </div>
     </div>
 
     <!-- ════════ Tab: Shipping ════════ -->
@@ -884,7 +877,7 @@ table.data tr:hover td{background:#fafbfc}
             <div class="sub">PCB 72,000 / LCD 65,000 / MB 23,000<br><span style="color:var(--text-3);font-size:11px;">+ 세척비 7,000원 (작업당)</span></div>
           </div>
           <div class="cost-box">
-            <div class="icon-line">👤 볼타레스 작업 가치</div>
+            <div class="icon-line">👤 볼타레스 AS 비용</div>
             <div class="v" id="ven-actual">—</div>
             <div class="sub" id="ven-actual-sub">—</div>
           </div>
@@ -1281,11 +1274,13 @@ function renderKPI() {
   const repeats = Object.values(serialCount).filter(c => c >= 2).length;
   const repeatPct = total ? (repeats/total*100) : 0;
 
+  // 평균 청구액 (건당)
+  const avgBilled = total ? sumBilled/total : 0;
+
   const kpis = [
     {label:'총 작업 수량', val:fmt.num(total), unit:'건', color:'slate', icon:'wrench', foot:'필터 적용 기준'},
-    {label:'총 작업 가치',   val:fmt.num(sumValue), unit:'원', color:'green', icon:'won',   foot:'공임 + 부품 (실제 가치)'},
-    {label:'볼타레스 AS 청구액', val:fmt.num(sumBilled), unit:'원', color:'teal', icon:'won', foot:'공임만 · 부품비 0원 (티오더 지급분)'},
-    {label:'평균 작업 가치', val:fmt.num(Math.round(avgValue)), unit:'원', color:'amber', icon:'calc', foot:'건당 공임 + 부품'},
+    {label:'볼타레스 AS 청구액', val:fmt.num(sumBilled), unit:'원', color:'green', icon:'won', foot:'공임만 · 부품비 0원 (티오더 지급분)'},
+    {label:'건당 평균 청구액', val:fmt.num(Math.round(avgBilled)), unit:'원', color:'amber', icon:'calc', foot:'건당 공임'},
     {label:'복합수리 비율', val:multiPct.toFixed(0), unit:'%', color:'purple', icon:'layers', foot:`${multi}건 / ${total}건`},
     {label:'평균 처리 리드타임', val:avgLead.toFixed(1), unit:'일', color:'cyan', icon:'clock', foot:'수리등록 ~ 출고 소요일'},
     {label:'재발 수리율', val:repeatPct.toFixed(1), unit:'%', color:'rose', icon:'refresh', foot:`${repeats}건 재입고`},
@@ -1380,7 +1375,7 @@ function renderMonthly() {
   state.filtered.forEach(e => {
     const ym = fmt.ym(e.date);
     if(!buckets[ym]) buckets[ym] = { sum:0, cnt:0 };
-    // 작업 가치 = 공임 + 부품 실제 가치 (KPI '총 작업 가치'와 동일 정의)
+    // 월별 매출 = 공임 + 부품 실제 가치 (절감액 산정과 동일 정의)
     buckets[ym].sum += Number(e.total||0) + partsValue(e);
     buckets[ym].cnt += 1;
   });
@@ -1620,45 +1615,6 @@ function renderHeatmap() {
   document.getElementById('heatmap-weekly').innerHTML = html;
 }
 
-function renderAvgCost() {
-  const sums = {};
-  const cnts = {};
-  state.filtered.forEach(e => {
-    const works = e.works || [];
-    if(!works.length) return;
-    // 비용은 work 종류별로 균등 분배 가정
-    const per = e.total / works.length;
-    works.forEach(w => {
-      const name = workName(w);
-      sums[name] = (sums[name]||0) + per;
-      cnts[name] = (cnts[name]||0) + 1;
-    });
-  });
-  const items = Object.keys(sums).map(k => ({name:k, avg: sums[k]/cnts[k]}));
-  items.sort((a,b) => a.avg - b.avg);
-
-  destroyChart('avgCost');
-  state.charts.avgCost = new Chart(document.getElementById('chart-avg-cost'), {
-    type:'bar',
-    data:{
-      labels: items.map(x => x.name),
-      datasets:[{
-        data: items.map(x => Math.round(x.avg)),
-        backgroundColor: items.map(x => WORK_COLORS[x.name]||'#94a3b8'),
-        borderRadius:6,
-      }],
-    },
-    options:{
-      responsive:true, maintainAspectRatio:false,
-      plugins:{ legend:{ display:false } },
-      scales:{
-        y:{ beginAtZero:true, ticks:{ callback:v=>fmt.num(v)+'원', font:{size:10} }, grid:{ color:'#f1f5f9' } },
-        x:{ ticks:{ font:{size:11} }, grid:{ display:false } },
-      },
-    },
-  });
-}
-
 /* ═══════════════════════════════════════════════════════════════
  *  RENDER: 출고 목록 탭
  * ═════════════════════════════════════════════════════════════ */
@@ -1858,7 +1814,7 @@ function renderCost() {
       labels,
       datasets:[
         { label:'태클라스트 단가', data:estData, backgroundColor:'#fda4af', borderRadius:6 },
-        { label:'볼타레스 작업 가치', data:actData, backgroundColor:'#86efac', borderRadius:6 },
+        { label:'볼타레스 AS 비용', data:actData, backgroundColor:'#86efac', borderRadius:6 },
       ],
     },
     options:{
@@ -2118,7 +2074,7 @@ function activateTab(name) {
   if(name === 'shipping' && !state.charts._shipDone) { renderShipping(); state.charts._shipDone = true; }
   if(name === 'cost' && !state.charts.vendor) renderCost();
   if(name === 'analysis' && !state.charts.quarter) {
-    renderQuarter(); renderWorktype(); renderHeatmap(); renderAvgCost();
+    renderQuarter(); renderWorktype(); renderHeatmap(); // renderAvgCost() 제거됨 (2026-04-29)
   }
   if(name === 'alerts') renderAlerts();
 }
@@ -2276,7 +2232,7 @@ function refresh() {
   generateAlerts();
   // 현재 활성 탭이 dashboard 외라면 그것도 다시
   const activeTab = document.querySelector('.tab.active')?.dataset.tab;
-  if(activeTab === 'analysis') { renderQuarter(); renderWorktype(); renderHeatmap(); renderAvgCost(); }
+  if(activeTab === 'analysis') { renderQuarter(); renderWorktype(); renderHeatmap(); // renderAvgCost() 제거됨 (2026-04-29) }
   if(activeTab === 'shipping') renderShipping();
   if(activeTab === 'cost') renderCost();
   if(activeTab === 'alerts') renderAlerts();
