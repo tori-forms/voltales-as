@@ -884,7 +884,7 @@ table.data tr:hover td{background:#fafbfc}
             <div class="sub">PCB 72,000 / LCD 65,000 / MB 23,000</div>
           </div>
           <div class="cost-box">
-            <div class="icon-line">👤 볼타레스 실제 비용</div>
+            <div class="icon-line">👤 볼타레스 AS 청구액</div>
             <div class="v" id="ven-actual">—</div>
             <div class="sub" id="ven-actual-sub">—</div>
           </div>
@@ -1017,15 +1017,24 @@ function getWeekOfMonth(d) {
   return Math.min(4, Math.ceil(dt.getDate()/7));
 }
 
-/* 부품비 계산: entry의 model + works를 priceSettings.modelParts에서 lookup
-   admin '단가설정' 시트의 modelParts 구조: { 'S2PRO_N': { pcb: 62000, panel: ..., board: ..., nonbat: ... }, 'S2_N': {...} } */
-function partsCost(entry) {
+/* 부품비 계산
+   ※ 2026-04-29 기준 정책 변경:
+      모든 부품을 볼타레스가 사전 지급하므로 청구 대상 부품비 = 0원.
+      따라서 대시보드 '볼타레스 AS 청구액' = 공임비만.
+   ※ 향후 폼즈 자비 구매분이 발생하면 아래 _calcPartsCost 로직을 활용해
+      재고 시스템 기반 FIFO 분리 후 자비분만 합산하도록 정교화 예정.
+   ※ 임시로 정책을 되돌리려면 partsCost = _calcPartsCost 한 줄 변경. */
+function _calcPartsCost(entry) {
   if(!entry) return 0;
   const ps = (state.raw && state.raw.priceSettings) || {};
   const modelParts = ps.modelParts || {};
   const modelPrice = modelParts[entry.model];
   if(!modelPrice) return 0;
   return (entry.works || []).reduce((sum, w) => sum + (Number(modelPrice[w]) || 0), 0);
+}
+function partsCost(entry) {
+  // 현재 정책: 모든 부품이 볼타레스 사전 지급분이므로 청구 대상 부품비는 0원
+  return 0;
 }
 
 /* 수리항목 한글 이름 매핑 */
@@ -1443,7 +1452,7 @@ function renderCostStruct() {
   state.charts['cost-struct'] = new Chart(document.getElementById('chart-cost-struct'), {
     type:'doughnut',
     data:{
-      labels:['공임비','부품비'],
+      labels:['공임비','부품비 (티오더 지급분)'],
       datasets:[{ data:[totalLabor, totalParts], backgroundColor:['#a855f7','#fb923c'], borderWidth:0 }],
     },
     options:{
@@ -1772,10 +1781,9 @@ function renderCost() {
   // 1) 논배터리 AS 비용 vs 새제품 (논배터리 작업 entry만, 논배터리 공임+부품)
   const nonbatData = data.filter(e => (e.works||[]).includes('nonbat'));
   const nonbatCount = nonbatData.length;
+  // 정책 (2026-04-29~): 부품비 0원 (논배터리 어셈블리도 티오더 사전 지급분)
   const totalAS = nonbatData.reduce((s, e) => {
-    const mp = modelPartsAll[e.model] || {};
-    const nbParts = Number(mp['nonbat']) || 0;
-    return s + NONBAT_PRICE_PER + nbParts;
+    return s + NONBAT_PRICE_PER;  // 공임만
   }, 0);
   const totalNew = nonbatCount * NEW_PRICE;
   const save = totalNew - totalAS;
@@ -1801,9 +1809,10 @@ function renderCost() {
     const mp = modelPartsAll[e.model] || {};
     let taec = TAECLAST.wash; // 세척비 (타사 작업 있는 건에만)
     let forms = 0;
-    if(ws.has('pcb'))   { taec += TAECLAST.pcb;   forms += FORMS_LABOR.pcb   + (Number(mp.pcb)||0); }
-    if(ws.has('panel')) { taec += TAECLAST.panel; forms += FORMS_LABOR.panel + (Number(mp.panel)||0); }
-    if(ws.has('board')) { taec += TAECLAST.board; forms += FORMS_LABOR.board + (Number(mp.board)||0); }
+    // 정책 (2026-04-29~): 부품비 0원 (모든 부품 볼타레스 지급분)
+    if(ws.has('pcb'))   { taec += TAECLAST.pcb;   forms += FORMS_LABOR.pcb;   }
+    if(ws.has('panel')) { taec += TAECLAST.panel; forms += FORMS_LABOR.panel; }
+    if(ws.has('board')) { taec += TAECLAST.board; forms += FORMS_LABOR.board; }
     estimated += taec;
     actual    += forms;
   });
@@ -1813,7 +1822,7 @@ function renderCost() {
   document.getElementById('ven-count').textContent = venCount;
   document.getElementById('ven-est').innerHTML = fmt.num(estimated) + '<span class="unit">원</span>';
   document.getElementById('ven-actual').innerHTML = fmt.num(actual) + '<span class="unit">원</span>';
-  document.getElementById('ven-actual-sub').textContent = `공임비 + 부품비 · 건당 ${fmt.num(Math.round(actual/Math.max(venCount,1)))}원`;
+  document.getElementById('ven-actual-sub').textContent = `공임비만 · 건당 ${fmt.num(Math.round(actual/Math.max(venCount,1)))}원`;
   document.getElementById('ven-save').innerHTML = fmt.num(venSave) + '<span class="unit">원</span>';
   document.getElementById('ven-save-pct').textContent = venCount > 0 ? `${venSavePct.toFixed(0)}% 저렴 · 건당 ${fmt.num(Math.round(venSave/Math.max(venCount,1)))}원 절감` : '데이터 없음';
 
@@ -1822,9 +1831,11 @@ function renderCost() {
   data.forEach(e => {
     const ws = new Set(e.works||[]);
     const mp = modelPartsAll[e.model] || {};
-    if(ws.has('pcb'))   { buckets['PCB 교체'].e += TAECLAST.pcb;   buckets['PCB 교체'].a += FORMS_LABOR.pcb   + (Number(mp.pcb)||0);   buckets['PCB 교체'].c++; }
-    if(ws.has('panel')) { buckets['LCD 교체'].e += TAECLAST.panel; buckets['LCD 교체'].a += FORMS_LABOR.panel + (Number(mp.panel)||0); buckets['LCD 교체'].c++; }
-    if(ws.has('board')) { buckets['MB수리'].e += TAECLAST.board; buckets['MB수리'].a += FORMS_LABOR.board + (Number(mp.board)||0); buckets['MB수리'].c++; }
+    // 정책 (2026-04-29~): 부품비 0원 (모든 부품 티오더 사전 지급분)
+    // ⚠️ 버그 수정 (2026-04-29): 태클라스트 단가에 세척비 7,000원 누락되어 있었음 → 추가
+    if(ws.has('pcb'))   { buckets['PCB 교체'].e += TAECLAST.pcb   + TAECLAST.wash; buckets['PCB 교체'].a += FORMS_LABOR.pcb;   buckets['PCB 교체'].c++; }
+    if(ws.has('panel')) { buckets['LCD 교체'].e += TAECLAST.panel + TAECLAST.wash; buckets['LCD 교체'].a += FORMS_LABOR.panel; buckets['LCD 교체'].c++; }
+    if(ws.has('board')) { buckets['MB수리'].e += TAECLAST.board   + TAECLAST.wash; buckets['MB수리'].a += FORMS_LABOR.board;   buckets['MB수리'].c++; }
   });
   const labels = Object.keys(buckets);
   const estData = labels.map(k => buckets[k].c > 0 ? Math.round(buckets[k].e/buckets[k].c) : 0);
@@ -1837,7 +1848,7 @@ function renderCost() {
       labels,
       datasets:[
         { label:'태클라스트 단가', data:estData, backgroundColor:'#fda4af', borderRadius:6 },
-        { label:'볼타레스 실제 비용', data:actData, backgroundColor:'#86efac', borderRadius:6 },
+        { label:'볼타레스 AS 청구액', data:actData, backgroundColor:'#86efac', borderRadius:6 },
       ],
     },
     options:{
@@ -1861,9 +1872,9 @@ function renderCost() {
     const mp = modelPartsAll[e.model] || {};
     let saveThis = 0;
 
-    // (1) 논배터리 절감: 새제품 가격 - (공임 + 부품비)
+    // (1) 논배터리 절감: 새제품 가격 - 공임 (부품비 0원 - 티오더 사전 지급분)
     if(ws.has('nonbat')) {
-      const nbCost = NONBAT_PRICE_PER + (Number(mp.nonbat) || 0);
+      const nbCost = NONBAT_PRICE_PER;  // 부품비 제거 (논배터리 어셈블리도 티오더 지급분)
       saveThis += (NEW_PRICE - nbCost);
     }
 
@@ -1872,9 +1883,10 @@ function renderCost() {
     if(hasComp) {
       let taec = TAECLAST.wash;
       let forms = 0;
-      if(ws.has('pcb'))   { taec += TAECLAST.pcb;   forms += FORMS_LABOR.pcb   + (Number(mp.pcb)||0); }
-      if(ws.has('panel')) { taec += TAECLAST.panel; forms += FORMS_LABOR.panel + (Number(mp.panel)||0); }
-      if(ws.has('board')) { taec += TAECLAST.board; forms += FORMS_LABOR.board + (Number(mp.board)||0); }
+      // 정책 (2026-04-29~): 부품비 0원 (모든 부품 티오더 사전 지급분)
+      if(ws.has('pcb'))   { taec += TAECLAST.pcb;   forms += FORMS_LABOR.pcb;   }
+      if(ws.has('panel')) { taec += TAECLAST.panel; forms += FORMS_LABOR.panel; }
+      if(ws.has('board')) { taec += TAECLAST.board; forms += FORMS_LABOR.board; }
       saveThis += (taec - forms);
     }
 
