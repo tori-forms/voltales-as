@@ -1225,9 +1225,16 @@ function applyFilter() {
     return true;
   });
 
-  // 출고이력 필터링 (모델 + 시리얼만)
+  // 출고이력 필터링 (모델 + 시리얼 + 날짜)
   const shipLog = state.raw.shipLog || [];
   state.filteredShip = shipLog.filter(s => {
+    // 날짜 필터 (출고일자 기준)
+    if(from || to) {
+      if(!s.shipDate) return false; // 출고일 없으면 제외
+      const d = new Date(s.shipDate);
+      if(from && d < from) return false;
+      if(to && d > to) return false;
+    }
     if(f.model !== 'all' && s.model !== f.model) return false;
     if(f.serial && !String(s.serial).toLowerCase().includes(f.serial.toLowerCase())) return false;
     return true;
