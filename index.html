@@ -1388,7 +1388,7 @@ function renderDistribution() {
 function renderMonthly() {
   const buckets = {};
   state.filtered.forEach(e => {
-    const ym = fmt.ym(e.date);
+    const ym = fmt.ym(e.shipDate || e.date);  // 출고월 기준
     if(!buckets[ym]) buckets[ym] = { sum:0, cnt:0 };
     // 월별 매출 = 공임 + 부품 실제 가치
     buckets[ym].sum += Number(e.total||0) + partsValue(e);
@@ -1551,7 +1551,7 @@ function renderTopCauses() {
 function renderQuarter() {
   const buckets = { Q1:0, Q2:0, Q3:0, Q4:0 };
   state.filtered.forEach(e => {
-    const q = getQuarter(e.date);
+    const q = getQuarter(e.shipDate || e.date);  // 출고일 기준
     if(buckets[q] !== undefined) buckets[q]++;
   });
   destroyChart('quarter');
@@ -1605,10 +1605,10 @@ function renderHeatmap() {
   const grid = {};
   for(let d=1; d<=6; d++) { grid[d] = {1:0,2:0,3:0,4:0}; }
   state.filtered.forEach(e => {
-    const dt = new Date(e.date);
+    const dt = new Date(e.shipDate || e.date);  // 출고일 기준
     let dow = dt.getDay(); // 0=일 ~ 6=토
     if(dow === 0) return; // 일요일 제외
-    const w = getWeekOfMonth(e.date);
+    const w = getWeekOfMonth(e.shipDate || e.date);  // 출고일 기준
     grid[dow][w] = (grid[dow][w]||0) + 1;
   });
 
@@ -1848,7 +1848,7 @@ function renderCost() {
   // - PCB/LCD/MB 작업 entry: 태클라스트(세척비 포함) - (FORMS_LABOR + 부품비)
   const monthly = {};
   data.forEach(e => {
-    const ym = fmt.ym(e.date);
+    const ym = fmt.ym(e.shipDate || e.date);  // 출고월 기준
     if(!monthly[ym]) monthly[ym] = { save:0 };
     const ws = new Set(e.works || []);
     const mp = modelPartsAll[e.model] || {};
@@ -1989,7 +1989,7 @@ function generateAlerts() {
   // ── 3) 매출 변동 (이번 달 vs 전월) ──
   const monthlyTotal = {};
   data.forEach(e => {
-    const ym = fmt.ym(e.date);
+    const ym = fmt.ym(e.shipDate || e.date);  // 출고월 기준
     monthlyTotal[ym] = (monthlyTotal[ym]||0) + Number(e.total||0);
   });
   const months = Object.keys(monthlyTotal).sort();
