@@ -623,10 +623,12 @@ table.data tr:hover td{background:#fafbfc}
       <button class="chip active" data-period="all">전체</button>
       <button class="chip" data-period="thisMonth">이번 달</button>
       <button class="chip" data-period="lastMonth">지난 달</button>
-      <button class="chip" data-period="Q1">Q1</button>
-      <button class="chip" data-period="Q2">Q2</button>
-      <button class="chip" data-period="Q3">Q3</button>
-      <button class="chip" data-period="Q4">Q4</button>
+      <span style="margin:0 4px 0 12px;color:var(--text2);font-size:13px;align-self:center;">분기:</span>
+      <button class="chip active" data-quarter="all">전체</button>
+      <button class="chip" data-quarter="Q1">Q1</button>
+      <button class="chip" data-quarter="Q2">Q2</button>
+      <button class="chip" data-quarter="Q3">Q3</button>
+      <button class="chip" data-quarter="Q4">Q4</button>
 
       <div class="filter-group">
         <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
@@ -947,6 +949,7 @@ const state = {
   filteredShip: [], // 필터링된 출고이력
   filter: {
     period: 'all',
+    quarter: 'all',
     dateFrom: '',
     dateTo: '',
     model: 'all',
@@ -1209,15 +1212,15 @@ function applyFilter() {
     }
   }
 
-  // 분기(제조년월 기준) 필터 헬퍼
+  // 분기(제조년월 기준) 필터 헬퍼 - f.quarter 참조 (기간과 독립적)
   const QUARTER_RANGES = {Q1:[1,3], Q2:[4,6], Q3:[7,9], Q4:[10,12]};
-  const isQuarter = ['Q1','Q2','Q3','Q4'].includes(f.period);
+  const isQuarter = ['Q1','Q2','Q3','Q4'].includes(f.quarter);
   const checkQuarter = (serial) => {
     if(!isQuarter) return true;
     const ym = extractYYMM(serial);
     if(!ym) return false;
     const m = parseInt(ym.slice(5));
-    const [start, end] = QUARTER_RANGES[f.period];
+    const [start, end] = QUARTER_RANGES[f.quarter];
     return m >= start && m <= end;
   };
 
@@ -2167,6 +2170,15 @@ function bindEvents() {
       refresh();
     });
   });
+  // Quarter chips (제조년월 기준)
+  document.querySelectorAll('.chip[data-quarter]').forEach(c => {
+    c.addEventListener('click', () => {
+      document.querySelectorAll('.chip[data-quarter]').forEach(x => x.classList.remove('active'));
+      c.classList.add('active');
+      state.filter.quarter = c.dataset.quarter;
+      refresh();
+    });
+  });
   // Model chips
   document.querySelectorAll('.chip[data-model]').forEach(c => {
     c.addEventListener('click', () => {
@@ -2195,8 +2207,9 @@ function bindEvents() {
 
   document.getElementById('btn-search').addEventListener('click', refresh);
   document.getElementById('btn-reset').addEventListener('click', () => {
-    state.filter = { period:'all', dateFrom:'', dateTo:'', model:'all', yymm:'all', worktype:'all', serial:'' };
+    state.filter = { period:'all', quarter:'all', dateFrom:'', dateTo:'', model:'all', yymm:'all', worktype:'all', serial:'' };
     document.querySelectorAll('.chip[data-period]').forEach(c => c.classList.toggle('active', c.dataset.period === 'all'));
+    document.querySelectorAll('.chip[data-quarter]').forEach(c => c.classList.toggle('active', c.dataset.quarter === 'all'));
     document.querySelectorAll('.chip[data-model]').forEach(c => c.classList.toggle('active', c.dataset.model === 'all'));
     document.getElementById('f-yymm').value = 'all';
     document.getElementById('f-worktype').value = 'all';
