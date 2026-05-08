@@ -1232,6 +1232,12 @@ function applyFilter() {
     if(f.serial && !String(s.serial).toLowerCase().includes(f.serial.toLowerCase())) return false;
     return true;
   });
+  // 최신 출고일 순으로 정렬 (내림차순)
+  state.filteredShip.sort((a, b) => {
+    const da = String(a.shipDate || '');
+    const db = String(b.shipDate || '');
+    return db.localeCompare(da);
+  });
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -2232,6 +2238,36 @@ async function init() {
 
   try {
     state.raw = await loadData();
+
+    // ════ 디버그 로그 (자동 출력) ════
+    console.log('═══════════ [voltales-as 진단 정보] ═══════════');
+    console.log('📦 entries (수리 데이터):', (state.raw.entries || []).length, '건');
+    console.log('🚚 shipLog (출고 데이터):', (state.raw.shipLog || []).length, '건');
+
+    if(state.raw.shipLog && state.raw.shipLog.length > 0) {
+      // 날짜별 분포
+      const dateMap = {};
+      state.raw.shipLog.forEach(s => {
+        const d = String(s.shipDate || 'unknown').slice(0, 10);
+        dateMap[d] = (dateMap[d] || 0) + 1;
+      });
+      const dates = Object.keys(dateMap).sort();
+      console.log('📅 출고일별 분포:');
+      dates.forEach(d => console.log('   ' + d + ': ' + dateMap[d] + '건'));
+
+      // 가장 최근 5건
+      const sorted = [...state.raw.shipLog].sort((a, b) => {
+        return String(b.shipDate || '').localeCompare(String(a.shipDate || ''));
+      });
+      console.log('🕒 가장 최근 출고 5건:');
+      sorted.slice(0, 5).forEach((s, i) => {
+        console.log('   #' + (i+1) + ' ' + s.shipDate + ' / ' + s.serial + ' / ' + s.model);
+      });
+    } else {
+      console.warn('⚠️ shipLog 데이터가 없습니다!');
+    }
+    console.log('═══════════════════════════════════════════════');
+    // ════ 디버그 로그 끝 ════
 
     // 업데이트 시간 표시
     const now = new Date();
