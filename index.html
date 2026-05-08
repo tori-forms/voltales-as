@@ -1196,7 +1196,8 @@ function applyFilter() {
   let from = f.dateFrom ? new Date(f.dateFrom) : null;
   let to = f.dateTo ? new Date(f.dateTo + 'T23:59:59') : null;
 
-  // period preset
+  // period preset (이번 달/지난 달은 출고일 기준)
+  // Q1~Q4는 제조년월(시리얼) 기준이라 from/to 안 씀, 별도 처리
   if(f.period !== 'all' && !f.dateFrom) {
     const now = new Date();
     if(f.period === 'thisMonth') {
@@ -1205,20 +1206,20 @@ function applyFilter() {
     } else if(f.period === 'lastMonth') {
       from = new Date(now.getFullYear(), now.getMonth()-1, 1);
       to = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
-    } else if(f.period === 'Q1') {
-      from = new Date(now.getFullYear(), 0, 1);
-      to = new Date(now.getFullYear(), 3, 0, 23, 59, 59);
-    } else if(f.period === 'Q2') {
-      from = new Date(now.getFullYear(), 3, 1);
-      to = new Date(now.getFullYear(), 6, 0, 23, 59, 59);
-    } else if(f.period === 'Q3') {
-      from = new Date(now.getFullYear(), 6, 1);
-      to = new Date(now.getFullYear(), 9, 0, 23, 59, 59);
-    } else if(f.period === 'Q4') {
-      from = new Date(now.getFullYear(), 9, 1);
-      to = new Date(now.getFullYear(), 12, 0, 23, 59, 59);
     }
   }
+
+  // 분기(제조년월 기준) 필터 헬퍼
+  const QUARTER_RANGES = {Q1:[1,3], Q2:[4,6], Q3:[7,9], Q4:[10,12]};
+  const isQuarter = ['Q1','Q2','Q3','Q4'].includes(f.period);
+  const checkQuarter = (serial) => {
+    if(!isQuarter) return true;
+    const ym = extractYYMM(serial);
+    if(!ym) return false;
+    const m = parseInt(ym.slice(5));
+    const [start, end] = QUARTER_RANGES[f.period];
+    return m >= start && m <= end;
+  };
 
   // 출고일 기준 필터링 (고객사 대시보드는 출고된 작업 기준)
   state.filtered = all
@@ -1226,6 +1227,8 @@ function applyFilter() {
     .filter(e => {
       // 출고된 것만 (출고일 없으면 제외)
       if(!e.shipDate) return false;
+      // 분기 필터 (제조년월 기준)
+      if(!checkQuarter(e.serial)) return false;
       // 출고일 기간 필터
       if(from || to) {
         const d = new Date(e.shipDate);
@@ -1246,8 +1249,10 @@ function applyFilter() {
       return true;
     });
 
-  // 출고이력 필터링 (모델 + 시리얼 + 날짜)
+  // 출고이력 필터링 (모델 + 시리얼 + 날짜 + 분기)
   state.filteredShip = shipLog.filter(s => {
+    // 분기 필터 (제조년월 기준)
+    if(!checkQuarter(s.serial)) return false;
     // 날짜 필터 (출고일자 기준)
     if(from || to) {
       if(!s.shipDate) return false; // 출고일 없으면 제외
