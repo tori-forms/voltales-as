@@ -1183,6 +1183,13 @@ function generateDemoData() {
 function applyFilter() {
   const f = state.filter;
   const all = state.raw.entries || [];
+  const shipLog = state.raw.shipLog || [];
+
+  // 시리얼별 출고일 맵 (출고일 기준 필터링용)
+  const shipDateMap = new Map();
+  shipLog.forEach(s => {
+    if(s.serial && s.shipDate) shipDateMap.set(s.serial, s.shipDate);
+  });
 
   let from = f.dateFrom ? new Date(f.dateFrom) : null;
   let to = f.dateTo ? new Date(f.dateTo + 'T23:59:59') : null;
@@ -1205,28 +1212,33 @@ function applyFilter() {
     }
   }
 
-  state.filtered = all.filter(e => {
-    if(from || to) {
-      const d = new Date(e.date);
-      if(from && d < from) return false;
-      if(to && d > to) return false;
-    }
-    if(f.model !== 'all' && e.model !== f.model) return false;
-    if(f.yymm !== 'all') {
-      const ym = extractYYMM(e.serial);
-      if(ym !== f.yymm) return false;
-    }
-    if(f.worktype !== 'all') {
-      const wlen = (e.works||[]).length;
-      if(f.worktype === 'single' && wlen > 1) return false;
-      if(f.worktype === 'multi' && wlen <= 1) return false;
-    }
-    if(f.serial && !String(e.serial).toLowerCase().includes(f.serial.toLowerCase())) return false;
-    return true;
-  });
+  // 출고일 기준 필터링 (고객사 대시보드는 출고된 작업 기준)
+  state.filtered = all
+    .map(e => ({...e, shipDate: shipDateMap.get(e.serial)}))
+    .filter(e => {
+      // 출고된 것만 (출고일 없으면 제외)
+      if(!e.shipDate) return false;
+      // 출고일 기간 필터
+      if(from || to) {
+        const d = new Date(e.shipDate);
+        if(from && d < from) return false;
+        if(to && d > to) return false;
+      }
+      if(f.model !== 'all' && e.model !== f.model) return false;
+      if(f.yymm !== 'all') {
+        const ym = extractYYMM(e.serial);
+        if(ym !== f.yymm) return false;
+      }
+      if(f.worktype !== 'all') {
+        const wlen = (e.works||[]).length;
+        if(f.worktype === 'single' && wlen > 1) return false;
+        if(f.worktype === 'multi' && wlen <= 1) return false;
+      }
+      if(f.serial && !String(e.serial).toLowerCase().includes(f.serial.toLowerCase())) return false;
+      return true;
+    });
 
   // 출고이력 필터링 (모델 + 시리얼 + 날짜)
-  const shipLog = state.raw.shipLog || [];
   state.filteredShip = shipLog.filter(s => {
     // 날짜 필터 (출고일자 기준)
     if(from || to) {
@@ -1624,7 +1636,10 @@ function renderHeatmap() {
 function renderShipping() {
   const ship = state.filteredShip;
   const entries = state.filtered;
-  const entryMap = new Map(entries.map(e => [e.serial, e]));
+  // 처리일(등록일~출고일) 매칭용은 전체 entries 기준
+  // (출고일 필터로 본 항목의 등록일은 다른 기간일 수 있음)
+  const allEntries = state.raw.entries || [];
+  const entryMap = new Map(allEntries.map(e => [e.serial, e]));
 
   // 출고 = ship에 있음, 미출고 = entries에 있는데 ship에 없음
   const shippedSerials = new Set(ship.map(s => s.serial));
