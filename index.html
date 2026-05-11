@@ -831,6 +831,7 @@ table.data tr:hover td{background:#fafbfc}
                 <th>수리항목</th>
                 <th>출고일</th>
                 <th>처리일</th>
+                <th style="text-align:right">청구금액</th>
                 <th>상태</th>
               </tr>
             </thead>
@@ -1676,6 +1677,8 @@ function renderShipping() {
     const processDays = (repairDate && shipDate)
       ? Math.max(0.1, (shipDate - repairDate) / 86400000)
       : null;
+    // 청구금액 = 공임(e.total) + 청구 대상 부품비 (현재 0)
+    const billed = e ? Number(e.total||0) + partsBilled(e) : 0;
     rows.push({
       no: idx+1,
       serial: s.serial,
@@ -1683,6 +1686,7 @@ function renderShipping() {
       works: s.works || ((e?.works||[]).map(workName).join(' / ')),
       shipDate: s.shipDate || '-',
       processDays,
+      billed,
       status: '출고완료',
     });
   });
@@ -1694,6 +1698,7 @@ function renderShipping() {
       works: (e.works||[]).map(workName).join(' / '),
       shipDate: '-',
       processDays: null,
+      billed: 0, // 미출고는 미청구
       status: '출고대기',
     });
   });
@@ -1703,6 +1708,8 @@ function renderShipping() {
   const wait = rows.filter(r => r.status === '출고대기').length;
   const processList = rows.filter(r => r.processDays !== null).map(r => r.processDays);
   const avgProcess = processList.length ? processList.reduce((a,b)=>a+b,0)/processList.length : 0;
+  // 청구 금액 합계 (출고완료 기준)
+  const sumBilled = rows.filter(r => r.status === '출고완료').reduce((s,r) => s + (r.billed||0), 0);
 
   document.getElementById('ship-kpi').innerHTML = `
     <div class="card" style="padding:14px 16px">
@@ -1716,6 +1723,11 @@ function renderShipping() {
     <div class="card" style="padding:14px 16px">
       <div style="font-size:12px;color:var(--text-3);font-weight:600;margin-bottom:6px">평균 처리일</div>
       <div style="font-size:22px;font-weight:700;letter-spacing:-.02em">${avgProcess.toFixed(1)}<span style="font-size:13px;color:var(--text-2);margin-left:2px">일</span></div>
+    </div>
+    <div class="card" style="padding:14px 16px">
+      <div style="font-size:12px;color:var(--text-3);font-weight:600;margin-bottom:6px">총 청구 금액</div>
+      <div style="font-size:22px;font-weight:700;letter-spacing:-.02em">${fmt.num(sumBilled)}<span style="font-size:13px;color:var(--text-2);margin-left:2px">원</span></div>
+      <div style="font-size:11px;color:var(--text-3);margin-top:4px">공임만 · 부품비 0원</div>
     </div>
   `;
 
@@ -1739,9 +1751,10 @@ function renderShipping() {
         <td>${r.works}</td>
         <td>${r.shipDate}</td>
         <td>${r.processDays !== null ? r.processDays.toFixed(1)+'일' : '-'}</td>
+        <td style="text-align:right;font-variant-numeric:tabular-nums">${r.billed ? fmt.num(r.billed)+'원' : '-'}</td>
         <td><span class="tag ${tagClass}">${r.status}</span></td>
       </tr>`;
-  }).join('') || '<tr><td colspan="7"><div class="empty">데이터가 없습니다</div></td></tr>';
+  }).join('') || '<tr><td colspan="8"><div class="empty">데이터가 없습니다</div></td></tr>';
 
   // 페이지네이션 컨트롤 렌더
   const pgEl = document.getElementById('ship-pagination');
