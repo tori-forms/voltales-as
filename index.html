@@ -13,7 +13,7 @@
 
 <!-- Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/[email protected]/dist/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
 <style>
 :root{
@@ -2133,13 +2133,27 @@ function activateTab(name) {
 /* ═══════════════════════════════════════════════════════════════
  *  EXCEL EXPORT (CSV)
  * ═════════════════════════════════════════════════════════════ */
-function exportExcel() {
+// 라이브러리 로드 대기 (최대 5초)
+function waitForXLSX(retries = 10) {
+  return new Promise((resolve, reject) => {
+    if(typeof XLSX !== 'undefined') { resolve(); return; }
+    if(retries <= 0) { reject(new Error('XLSX 라이브러리 로드 실패')); return; }
+    setTimeout(() => waitForXLSX(retries - 1).then(resolve).catch(reject), 500);
+  });
+}
+
+async function exportExcel() {
   const data = state.filtered;
   if(!data.length) { toast('내보낼 데이터가 없습니다','error'); return; }
 
-  // SheetJS 로드 확인
-  if(typeof XLSX === 'undefined') {
-    toast('엑셀 라이브러리 로딩 중... 잠시 후 다시 시도해주세요.','error');
+  // SheetJS 로드 대기 (최대 5초)
+  try {
+    if(typeof XLSX === 'undefined') {
+      toast('엑셀 라이브러리 로딩 중...','info');
+      await waitForXLSX(10); // 0.5초 × 10회 = 5초
+    }
+  } catch(err) {
+    toast('엑셀 라이브러리 로드 실패. 페이지 새로고침 후 다시 시도해주세요.','error');
     return;
   }
 
