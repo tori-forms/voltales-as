@@ -13,6 +13,7 @@
 
 <!-- Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/[email protected]/dist/xlsx.full.min.js"></script>
 
 <style>
 :root{
@@ -2136,26 +2137,52 @@ function exportExcel() {
   const data = state.filtered;
   if(!data.length) { toast('내보낼 데이터가 없습니다','error'); return; }
 
+  // SheetJS 로드 확인
+  if(typeof XLSX === 'undefined') {
+    toast('엑셀 라이브러리 로딩 중... 잠시 후 다시 시도해주세요.','error');
+    return;
+  }
+
+  // 데이터 헤더 + 행
   const rows = [
-    ['시리얼번호','기종','수리항목','수리비용','등록일'],
+    ['시리얼번호','기종','수리항목','청구금액'],
     ...data.map(e => [
       e.serial,
       e.model || '',
       (e.works||[]).map(workName).join(' / '),
-      e.total,
-      fmt.date(e.date),
+      Number(e.total||0) + partsBilled(e),
     ]),
   ];
-  const csv = '\uFEFF' + rows.map(r => r.map(v =>
-    `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
-  const blob = new Blob([csv], { type:'text/csv;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `AS_현황_${new Date().toISOString().slice(0,10)}.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
-  toast('CSV 파일로 내보냈습니다');
+
+  // 시트 생성
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+
+  // 컬럼 너비 설정
+  ws['!cols'] = [
+    {wch:22}, // 시리얼번호
+    {wch:12}, // 기종
+    {wch:36}, // 수리항목
+    {wch:14}, // 청구금액
+  ];
+
+  // 청구금액 컬럼 (D, index 3) 숫자 포맷 (천단위 콤마)
+  const range = XLSX.utils.decode_range(ws['!ref']);
+  for(let R = 1; R <= range.e.r; R++) {
+    const cellAddr = XLSX.utils.encode_cell({r:R, c:3});
+    if(ws[cellAddr]) {
+      ws[cellAddr].t = 'n';
+      ws[cellAddr].z = '#,##0';
+    }
+  }
+
+  // 워크북 생성 + 시트 추가
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'AS 현황');
+
+  // 파일 다운로드
+  const today = new Date().toISOString().slice(0,10);
+  XLSX.writeFile(wb, `AS_현황_${today}.xlsx`);
+  toast('엑셀 파일로 내보냈습니다');
 }
 
 /* ═══════════════════════════════════════════════════════════════
