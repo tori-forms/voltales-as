@@ -1874,13 +1874,11 @@ function renderCost() {
   document.getElementById('cost-save-pct').textContent = savePct.toFixed(0)+'% 절감';
 
   // 2) 업체별 수리비 비교 (PCB/LCD/MB만, 논배터리 제외)
-  // 태클라스트 = 세척비(7000) + 작업단가
-  // ⭐ 볼타레스 청구액 = 공임비만 (현재 폼즈는 공임만 청구).
-  //    추후 부품도 폼즈가 주문하면 PARTS_BILLED=true로 바꿔 부품비도 청구액에 포함.
-  const PARTS_BILLED = (state.raw && state.raw.priceSettings && state.raw.priceSettings.partsBilled) === true;
+  // 태클라스트 = 세척비(7000) + 작업단가 (외주 단가 = 부품+공임 포함)
+  // ⭐ 볼타레스 = 공임 + 부품원가 (실제 수리 원가). 태클라스트 외주가와 공정 비교를 위해 항상 부품 포함.
   let estimated = 0;
   let actualLabor = 0;   // 공임비 합산
-  let actualParts = 0;   // 부품비 합산 (청구 여부와 무관하게 집계)
+  let actualParts = 0;   // 부품비 합산
   let venCount = 0;
   data.forEach(e => {
     const ws = new Set(e.works || []);
@@ -1894,17 +1892,15 @@ function renderCost() {
     if(ws.has('board')) { taec += TAECLAST.board; actualLabor += FORMS_LABOR.board; actualParts += (Number(mp.board)||0); }
     estimated += taec;
   });
-  // 청구액 = 공임비 (+ 부품 주문 시 부품비)
-  const actual = PARTS_BILLED ? (actualLabor + actualParts) : actualLabor;
+  // ⭐ 볼타레스 실제 원가 = 공임 + 부품 (외주 단가와 공정 비교)
+  const actual = actualLabor + actualParts;
   const venSave = estimated - actual;
   const venSavePct = estimated > 0 ? (venSave/estimated*100) : 0;
 
   document.getElementById('ven-count').textContent = venCount;
   document.getElementById('ven-est').innerHTML = fmt.num(estimated) + '<span class="unit">원</span>';
   document.getElementById('ven-actual').innerHTML = fmt.num(actual) + '<span class="unit">원</span>';
-  document.getElementById('ven-actual-sub').textContent = PARTS_BILLED
-    ? `공임비 ${fmt.num(actualLabor)} + 부품비 ${fmt.num(actualParts)} · 건당 ${fmt.num(Math.round(actual/Math.max(venCount,1)))}원`
-    : `공임비만 청구 · 건당 ${fmt.num(Math.round(actual/Math.max(venCount,1)))}원`;
+  document.getElementById('ven-actual-sub').textContent = `공임 ${fmt.num(actualLabor)} + 부품 ${fmt.num(actualParts)} · 건당 ${fmt.num(Math.round(actual/Math.max(venCount,1)))}원`;
   document.getElementById('ven-save').innerHTML = fmt.num(venSave) + '<span class="unit">원</span>';
   document.getElementById('ven-save-pct').textContent = venCount > 0 ? `${venSavePct.toFixed(0)}% 저렴 · 건당 ${fmt.num(Math.round(venSave/Math.max(venCount,1)))}원 절감` : '데이터 없음';
 
