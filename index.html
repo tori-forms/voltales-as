@@ -1555,8 +1555,8 @@ function renderCostStruct() {
     },
   });
 
-  // 부품 항목별 세부 (LCD: N개 / 합계 N원)
-  const partLabelKo = { pcb:'PCB 교체', panel:'LCD 교체', board:'MB(메인보드 부분수리)', nonbat:'논배터리 작업', battery:'배터리 교체' };
+  // 부품 항목별 세부 (LCD 부품: N개 / 합계 N원)
+  const partLabelKo = { pcb:'PCB 부품', panel:'LCD 부품', board:'MB(메인보드 부분수리) 부품', nonbat:'논배터리 부품', battery:'배터리 부품' };
   const partDetailRows = Object.entries(partUsage)
     .sort((a,b) => b[1].sum - a[1].sum)
     .map(([w, u]) => `<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-3);padding:2px 0;">
