@@ -1032,11 +1032,31 @@ function getWeekOfMonth(d) {
    - partsBilled(entry): 청구 대상 부품비 (현재 정책 0원, 미래 자비분만)
    2026-04-29 정책: 모든 부품 = 티오더 사전 지급분 → partsBilled = 0
    미래 자비 구매 시: 재고 시트 'source' 필드 기반 FIFO 분리 활성화 */
+/* ⭐ 기종명 정규화 — 언더스코어/공백/하이픈/대소문자 차이 무시
+   "S2PRO_N" / "S2PRON" / "s2pro n" → 모두 "S2PRON" 으로 통일 매칭 */
+function normalizeModel(m) {
+  return String(m || '').trim().toUpperCase().replace(/[_\s\-]/g, '');
+}
+
+/* modelParts를 정규화된 키로 변환 (한 번 만들어 캐시) */
+function getNormalizedModelParts() {
+  const ps = (state.raw && state.raw.priceSettings) || {};
+  const mp = ps.modelParts || {};
+  // raw 객체가 바뀌면 다시 생성
+  if(window._nmpCache && window._nmpCacheRef === mp) return window._nmpCache;
+  const result = {};
+  for(const [model, parts] of Object.entries(mp)) {
+    result[normalizeModel(model)] = parts;
+  }
+  window._nmpCache = result;
+  window._nmpCacheRef = mp;
+  return result;
+}
+
 function partsValue(entry) {
   if(!entry) return 0;
-  const ps = (state.raw && state.raw.priceSettings) || {};
-  const modelParts = ps.modelParts || {};
-  const modelPrice = modelParts[entry.model];
+  const nmp = getNormalizedModelParts();
+  const modelPrice = nmp[normalizeModel(entry.model)];
   if(!modelPrice) return 0;
   return (entry.works || []).reduce((sum, w) => sum + (Number(modelPrice[w]) || 0), 0);
 }
@@ -1494,25 +1514,7 @@ function renderYYMM() {
 
 /* 비용 구조 분석 (실제 수리에 들어간 원가: 공임 + 부품) */
 function renderCostStruct() {
-  const ps = (state.raw && state.raw.priceSettings) || {};
-  const modelPartsAll = ps.modelParts || {};
-
-  // ⭐ 디버그: 부품 단가 매칭 진단 (한 번만 출력)
-  if(!window._debuggedParts) {
-    window._debuggedParts = true;
-    console.log('[부품비 진단] priceSettings.modelParts:', modelPartsAll);
-    console.log('[부품비 진단] modelParts에 등록된 기종:', Object.keys(modelPartsAll));
-    const sampleModels = [...new Set(state.filtered.map(e => e.model))].slice(0, 10);
-    console.log('[부품비 진단] 실제 수리건의 기종 값(샘플):', sampleModels);
-    const sampleWorks = [...new Set(state.filtered.flatMap(e => e.works || []))];
-    console.log('[부품비 진단] 실제 수리건의 작업 키:', sampleWorks);
-    if(state.filtered[0]) {
-      const e0 = state.filtered[0];
-      console.log('[부품비 진단] 첫 수리건:', {model: e0.model, works: e0.works, total: e0.total});
-      console.log('[부품비 진단] → modelParts[그 기종]:', modelPartsAll[e0.model]);
-      console.log('[부품비 진단] → partsValue 결과:', partsValue(e0));
-    }
-  }
+  const modelPartsAll = getNormalizedModelParts();
 
   let totalLabor = 0, totalParts = 0;
   // 부품 항목별 사용 집계 (세부 표시용)
@@ -1521,7 +1523,7 @@ function renderCostStruct() {
     totalLabor += Number(e.total||0);     // 공임 (forms-as WORKS 단가 합산)
     totalParts += partsValue(e);          // 부품 실제 원가 (modelParts)
     // 항목별 부품 집계
-    const mp = modelPartsAll[e.model] || {};
+    const mp = modelPartsAll[normalizeModel(e.model)] || {};
     (e.works||[]).forEach(w => {
       const partPrice = Number(mp[w]) || 0;
       if(partPrice > 0) {
@@ -1845,10 +1847,10 @@ function goShippingPage(n) {
  * ═════════════════════════════════════════════════════════════ */
 function renderCost() {
   const data = state.filtered;
-  const ps = (state.raw && state.raw.priceSettings) || {};
-  const modelPartsAll = ps.modelParts || {};
+  const modelPartsAll = getNormalizedModelParts();
 
   // ─── 비용 비교용 단가 (admin과 동일하게 하드코딩) ───
+  const ps = (state.raw && state.raw.priceSettings) || {};
   const TAECLAST = { pcb:72000, panel:65000, board:23000, wash:7000 };
   const FORMS_LABOR = { pcb:15180, panel:10450, board:10450 };
   const NONBAT_PRICE_PER = Number(ps.nonbat) || 18700;
@@ -1858,7 +1860,7 @@ function renderCost() {
   const nonbatData = data.filter(e => (e.works||[]).includes('nonbat'));
   const nonbatCount = nonbatData.length;
   const totalAS = nonbatData.reduce((s, e) => {
-    const mp = modelPartsAll[e.model] || {};
+    const mp = modelPartsAll[normalizeModel(e.model)] || {};
     const nbParts = Number(mp['nonbat']) || 0;
     return s + NONBAT_PRICE_PER + nbParts;
   }, 0);
@@ -1885,7 +1887,7 @@ function renderCost() {
     const hasCompWork = ws.has('pcb') || ws.has('panel') || ws.has('board');
     if(!hasCompWork) return;
     venCount++;
-    const mp = modelPartsAll[e.model] || {};
+    const mp = modelPartsAll[normalizeModel(e.model)] || {};
     let taec = TAECLAST.wash; // 세척비 (타사 작업 있는 건에만)
     if(ws.has('pcb'))   { taec += TAECLAST.pcb;   actualLabor += FORMS_LABOR.pcb;   actualParts += (Number(mp.pcb)||0); }
     if(ws.has('panel')) { taec += TAECLAST.panel; actualLabor += FORMS_LABOR.panel; actualParts += (Number(mp.panel)||0); }
@@ -1908,7 +1910,7 @@ function renderCost() {
   const buckets = { 'PCB 교체':{e:0,a:0,c:0}, 'LCD 교체':{e:0,a:0,c:0}, 'MB수리':{e:0,a:0,c:0} };
   data.forEach(e => {
     const ws = new Set(e.works||[]);
-    const mp = modelPartsAll[e.model] || {};
+    const mp = modelPartsAll[normalizeModel(e.model)] || {};
     // 항목별 평균 단가 — 태클라스트는 작업당 세척비 7,000원 추가, 양쪽 모두 부품비 포함
     if(ws.has('pcb'))   { buckets['PCB 교체'].e += TAECLAST.pcb   + TAECLAST.wash; buckets['PCB 교체'].a += FORMS_LABOR.pcb   + (Number(mp.pcb)||0);   buckets['PCB 교체'].c++; }
     if(ws.has('panel')) { buckets['LCD 교체'].e += TAECLAST.panel + TAECLAST.wash; buckets['LCD 교체'].a += FORMS_LABOR.panel + (Number(mp.panel)||0); buckets['LCD 교체'].c++; }
@@ -1946,7 +1948,7 @@ function renderCost() {
     const ym = fmt.ym(e.shipDate || e.date);  // 출고월 기준
     if(!monthly[ym]) monthly[ym] = { save:0 };
     const ws = new Set(e.works || []);
-    const mp = modelPartsAll[e.model] || {};
+    const mp = modelPartsAll[normalizeModel(e.model)] || {};
     let saveThis = 0;
 
     // (1) 논배터리 절감: 새제품 가격 - (공임 + 부품비)
