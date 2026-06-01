@@ -904,6 +904,10 @@ table.data tr:hover td{background:var(--hover-bg,#fafbfc)}
           </div>
         </div>
         <div class="chart-wrap" style="height:300px;margin-top:14px"><canvas id="chart-vendor"></canvas></div>
+        <div style="margin-top:10px;padding-top:8px;border-top:1px dashed var(--border);font-size:10.5px;color:var(--text-3);line-height:1.6;">
+          ※ 한 건당 표준 부품만 산정 (부품 불량으로 인한 추가 사용량 제외)<br>
+          ※ 일부 작업(Wi-Fi 등)은 공임 미책정으로 비용에 미반영
+        </div>
       </div>
 
       <div class="card">
@@ -1577,6 +1581,10 @@ function renderCostStruct() {
       <div class="dist-pct">${fmt.pct(totalParts, grandTotal)}</div>
     </div>
     ${partDetailRows ? `<div style="margin-top:8px;padding-top:8px;border-top:1px dashed var(--border);">${partDetailRows}</div>` : ''}
+    <div style="margin-top:10px;padding-top:8px;border-top:1px dashed var(--border);font-size:10.5px;color:var(--text-3);line-height:1.6;">
+      ※ 한 건당 표준 부품만 산정 (부품 불량으로 인한 추가 사용량 제외)<br>
+      ※ 일부 작업(Wi-Fi 등)은 공임 미책정으로 비용에 미반영
+    </div>
   `;
 }
 
