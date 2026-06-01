@@ -430,6 +430,15 @@ table.data tr:hover td{background:#fafbfc}
   font-size:11.5px;font-weight:700;
   padding:2px 8px;border-radius:9999px;
 }
+/* ⭐ 다크모드 highlight 카드 가시성 개선 */
+:root[data-theme="dark"] .cost-box.highlight{
+  background:rgba(16,185,129,.12);
+  border:1.5px solid rgba(16,185,129,.45);
+}
+:root[data-theme="dark"] .cost-box.highlight .v{color:#34d399}
+:root[data-theme="dark"] .cost-box .pct-pill{
+  background:rgba(16,185,129,.25);color:#6ee7b7;
+}
 
 /* Alert items */
 .alert-list{display:flex;flex-direction:column;gap:10px}
@@ -1480,12 +1489,26 @@ function renderYYMM() {
   });
 }
 
-/* 비용 구조 분석 (공임비 vs 부품비) */
+/* 비용 구조 분석 (실제 수리에 들어간 원가: 공임 + 부품) */
 function renderCostStruct() {
+  const ps = (state.raw && state.raw.priceSettings) || {};
+  const modelPartsAll = ps.modelParts || {};
   let totalLabor = 0, totalParts = 0;
+  // 부품 항목별 사용 집계 (세부 표시용)
+  const partUsage = {}; // { pcb:{cnt, sum}, panel:{...}, board:{...}, nonbat:{...} }
   state.filtered.forEach(e => {
-    totalLabor += Number(e.total||0);     // 공임
-    totalParts += partsValue(e);          // 부품 실제 가치
+    totalLabor += Number(e.total||0);     // 공임 (forms-as WORKS 단가 합산)
+    totalParts += partsValue(e);          // 부품 실제 원가 (modelParts)
+    // 항목별 부품 집계
+    const mp = modelPartsAll[e.model] || {};
+    (e.works||[]).forEach(w => {
+      const partPrice = Number(mp[w]) || 0;
+      if(partPrice > 0) {
+        if(!partUsage[w]) partUsage[w] = { cnt:0, sum:0 };
+        partUsage[w].cnt++;
+        partUsage[w].sum += partPrice;
+      }
+    });
   });
   const grandTotal = totalLabor + totalParts;
   const totalMan = Math.round(grandTotal/10000);
@@ -1495,7 +1518,7 @@ function renderCostStruct() {
   state.charts['cost-struct'] = new Chart(document.getElementById('chart-cost-struct'), {
     type:'doughnut',
     data:{
-      labels:['공임비','부품비 (티오더 지급분)'],
+      labels:['공임비','부품비'],
       datasets:[{ data:[totalLabor, totalParts], backgroundColor:['#a855f7','#fb923c'], borderWidth:0 }],
     },
     options:{
@@ -1504,6 +1527,15 @@ function renderCostStruct() {
       plugins:{ legend:{ display:false } },
     },
   });
+
+  // 부품 항목별 세부 (LCD: N개 / 합계 N원)
+  const partLabelKo = { pcb:'PCB', panel:'LCD', board:'MB', nonbat:'논배터리', battery:'배터리' };
+  const partDetailRows = Object.entries(partUsage)
+    .sort((a,b) => b[1].sum - a[1].sum)
+    .map(([w, u]) => `<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-3);padding:2px 0;">
+        <span>${partLabelKo[w]||w}: ${u.cnt}개 사용</span>
+        <span>합계 ${fmt.num(u.sum)}원</span>
+      </div>`).join('');
 
   document.getElementById('cost-struct-legend').innerHTML = `
     <div class="dist-row">
@@ -1517,6 +1549,10 @@ function renderCostStruct() {
       <div class="dist-name">부품비</div>
       <div class="dist-val">${fmt.num(Math.round(totalParts/10000))}만원</div>
       <div class="dist-pct">${fmt.pct(totalParts, grandTotal)}</div>
+    </div>
+    ${partDetailRows ? `<div style="margin-top:8px;padding-top:8px;border-top:1px dashed var(--border);">${partDetailRows}</div>` : ''}
+    <div style="margin-top:8px;font-size:10.5px;color:var(--text-3);line-height:1.5;">
+      ※ 실제 수리에 투입된 원가 기준 (공임 + 부품). 청구액과 별개.
     </div>
   `;
 }
@@ -1817,9 +1853,13 @@ function renderCost() {
   document.getElementById('cost-save-pct').textContent = savePct.toFixed(0)+'% 절감';
 
   // 2) 업체별 수리비 비교 (PCB/LCD/MB만, 논배터리 제외)
-  // 태클라스트 = 세척비(7000) + 작업단가, 폼즈 = FORMS_LABOR + 부품비(modelParts)
+  // 태클라스트 = 세척비(7000) + 작업단가
+  // ⭐ 볼타레스 청구액 = 공임비만 (현재 폼즈는 공임만 청구).
+  //    추후 부품도 폼즈가 주문하면 PARTS_BILLED=true로 바꿔 부품비도 청구액에 포함.
+  const PARTS_BILLED = (state.raw && state.raw.priceSettings && state.raw.priceSettings.partsBilled) === true;
   let estimated = 0;
-  let actual = 0;
+  let actualLabor = 0;   // 공임비 합산
+  let actualParts = 0;   // 부품비 합산 (청구 여부와 무관하게 집계)
   let venCount = 0;
   data.forEach(e => {
     const ws = new Set(e.works || []);
@@ -1828,20 +1868,22 @@ function renderCost() {
     venCount++;
     const mp = modelPartsAll[e.model] || {};
     let taec = TAECLAST.wash; // 세척비 (타사 작업 있는 건에만)
-    let forms = 0;
-    if(ws.has('pcb'))   { taec += TAECLAST.pcb;   forms += FORMS_LABOR.pcb   + (Number(mp.pcb)||0); }
-    if(ws.has('panel')) { taec += TAECLAST.panel; forms += FORMS_LABOR.panel + (Number(mp.panel)||0); }
-    if(ws.has('board')) { taec += TAECLAST.board; forms += FORMS_LABOR.board + (Number(mp.board)||0); }
+    if(ws.has('pcb'))   { taec += TAECLAST.pcb;   actualLabor += FORMS_LABOR.pcb;   actualParts += (Number(mp.pcb)||0); }
+    if(ws.has('panel')) { taec += TAECLAST.panel; actualLabor += FORMS_LABOR.panel; actualParts += (Number(mp.panel)||0); }
+    if(ws.has('board')) { taec += TAECLAST.board; actualLabor += FORMS_LABOR.board; actualParts += (Number(mp.board)||0); }
     estimated += taec;
-    actual    += forms;
   });
+  // 청구액 = 공임비 (+ 부품 주문 시 부품비)
+  const actual = PARTS_BILLED ? (actualLabor + actualParts) : actualLabor;
   const venSave = estimated - actual;
   const venSavePct = estimated > 0 ? (venSave/estimated*100) : 0;
 
   document.getElementById('ven-count').textContent = venCount;
   document.getElementById('ven-est').innerHTML = fmt.num(estimated) + '<span class="unit">원</span>';
   document.getElementById('ven-actual').innerHTML = fmt.num(actual) + '<span class="unit">원</span>';
-  document.getElementById('ven-actual-sub').textContent = `공임비 + 부품비 · 건당 ${fmt.num(Math.round(actual/Math.max(venCount,1)))}원`;
+  document.getElementById('ven-actual-sub').textContent = PARTS_BILLED
+    ? `공임비 ${fmt.num(actualLabor)} + 부품비 ${fmt.num(actualParts)} · 건당 ${fmt.num(Math.round(actual/Math.max(venCount,1)))}원`
+    : `공임비만 청구 · 건당 ${fmt.num(Math.round(actual/Math.max(venCount,1)))}원`;
   document.getElementById('ven-save').innerHTML = fmt.num(venSave) + '<span class="unit">원</span>';
   document.getElementById('ven-save-pct').textContent = venCount > 0 ? `${venSavePct.toFixed(0)}% 저렴 · 건당 ${fmt.num(Math.round(venSave/Math.max(venCount,1)))}원 절감` : '데이터 없음';
 
