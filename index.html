@@ -890,7 +890,7 @@ table.data tr:hover td{background:var(--hover-bg,#fafbfc)}
           <div class="cost-box">
             <div class="icon-line">📋 태클라스트 예상</div>
             <div class="v" id="ven-est">—</div>
-            <div class="sub">PCB 72,000 / LCD 65,000 / MB 23,000<br><span style="color:var(--text-3);font-size:11px;">+ 세척비 7,000원 (작업당)</span></div>
+            <div class="sub">PCB 72,000 / LCD 65,000 / MB 23,000<br><span style="color:var(--text-3);font-size:11px;">+ 세척비 7,000 / S/W 설치 3,000원 (작업당)</span></div>
           </div>
           <div class="cost-box">
             <div class="icon-line">👤 볼타레스 AS 비용</div>
@@ -1859,7 +1859,7 @@ function renderCost() {
 
   // ─── 비용 비교용 단가 (admin과 동일하게 하드코딩) ───
   const ps = (state.raw && state.raw.priceSettings) || {};
-  const TAECLAST = { pcb:72000, panel:65000, board:23000, wash:7000 };
+  const TAECLAST = { pcb:72000, panel:65000, board:23000, wash:7000, sw:3000 };
   const FORMS_LABOR = { pcb:15180, panel:10450, board:10450 };
   const NONBAT_PRICE_PER = Number(ps.nonbat) || 18700;
   const NEW_PRICE = Number(ps.newProduct) || NEW_UNIT_PRICE;
@@ -1884,7 +1884,7 @@ function renderCost() {
   document.getElementById('cost-save-pct').textContent = savePct.toFixed(0)+'% 절감';
 
   // 2) 업체별 수리비 비교 (PCB/LCD/MB만, 논배터리 제외)
-  // 태클라스트 = 세척비(7000) + 작업단가 (외주 단가 = 부품+공임 포함)
+  // 태클라스트 = 세척비(7000) + S/W 설치비(3000) + 작업단가 (외주 단가 = 부품+공임 포함)
   // ⭐ 볼타레스 = 공임 + 부품원가 (실제 수리 원가). 태클라스트 외주가와 공정 비교를 위해 항상 부품 포함.
   let estimated = 0;
   let actualLabor = 0;   // 공임비 합산
@@ -1896,7 +1896,7 @@ function renderCost() {
     if(!hasCompWork) return;
     venCount++;
     const mp = modelPartsAll[normalizeModel(e.model)] || {};
-    let taec = TAECLAST.wash; // 세척비 (타사 작업 있는 건에만)
+    let taec = TAECLAST.wash + TAECLAST.sw; // 세척비 + S/W 설치비 (타사 작업 있는 건에만)
     if(ws.has('pcb'))   { taec += TAECLAST.pcb;   actualLabor += FORMS_LABOR.pcb;   actualParts += (Number(mp.pcb)||0); }
     if(ws.has('panel')) { taec += TAECLAST.panel; actualLabor += FORMS_LABOR.panel; actualParts += (Number(mp.panel)||0); }
     if(ws.has('board')) { taec += TAECLAST.board; actualLabor += FORMS_LABOR.board; actualParts += (Number(mp.board)||0); }
@@ -1919,10 +1919,10 @@ function renderCost() {
   data.forEach(e => {
     const ws = new Set(e.works||[]);
     const mp = modelPartsAll[normalizeModel(e.model)] || {};
-    // 항목별 평균 단가 — 태클라스트는 작업당 세척비 7,000원 추가, 양쪽 모두 부품비 포함
-    if(ws.has('pcb'))   { buckets['PCB 교체'].e += TAECLAST.pcb   + TAECLAST.wash; buckets['PCB 교체'].a += FORMS_LABOR.pcb   + (Number(mp.pcb)||0);   buckets['PCB 교체'].c++; }
-    if(ws.has('panel')) { buckets['LCD 교체'].e += TAECLAST.panel + TAECLAST.wash; buckets['LCD 교체'].a += FORMS_LABOR.panel + (Number(mp.panel)||0); buckets['LCD 교체'].c++; }
-    if(ws.has('board')) { buckets['MB수리'].e += TAECLAST.board   + TAECLAST.wash; buckets['MB수리'].a += FORMS_LABOR.board   + (Number(mp.board)||0); buckets['MB수리'].c++; }
+    // 항목별 평균 단가 — 태클라스트는 작업당 세척비 7,000 + S/W 설치 3,000원 추가, 양쪽 모두 부품비 포함
+    if(ws.has('pcb'))   { buckets['PCB 교체'].e += TAECLAST.pcb   + TAECLAST.wash + TAECLAST.sw; buckets['PCB 교체'].a += FORMS_LABOR.pcb   + (Number(mp.pcb)||0);   buckets['PCB 교체'].c++; }
+    if(ws.has('panel')) { buckets['LCD 교체'].e += TAECLAST.panel + TAECLAST.wash + TAECLAST.sw; buckets['LCD 교체'].a += FORMS_LABOR.panel + (Number(mp.panel)||0); buckets['LCD 교체'].c++; }
+    if(ws.has('board')) { buckets['MB수리'].e += TAECLAST.board   + TAECLAST.wash + TAECLAST.sw; buckets['MB수리'].a += FORMS_LABOR.board   + (Number(mp.board)||0); buckets['MB수리'].c++; }
   });
   const labels = Object.keys(buckets);
   const estData = labels.map(k => buckets[k].c > 0 ? Math.round(buckets[k].e/buckets[k].c) : 0);
@@ -1962,10 +1962,10 @@ function renderCost() {
       monthly[ym].nonbat += (NEW_PRICE - nbCost);
     }
 
-    // (2) 업체별 비교 절감: 태클라스트 - 볼타레스 (논배터리 제외, 세척비 포함)
+    // (2) 업체별 비교 절감: 태클라스트 - 볼타레스 (논배터리 제외, 세척비+S/W 포함)
     const hasComp = ws.has('pcb') || ws.has('panel') || ws.has('board');
     if(hasComp) {
-      let taec = TAECLAST.wash;
+      let taec = TAECLAST.wash + TAECLAST.sw;
       let forms = 0;
       if(ws.has('pcb'))   { taec += TAECLAST.pcb;   forms += FORMS_LABOR.pcb   + (Number(mp.pcb)||0); }
       if(ws.has('panel')) { taec += TAECLAST.panel; forms += FORMS_LABOR.panel + (Number(mp.panel)||0); }
