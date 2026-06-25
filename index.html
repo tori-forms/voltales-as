@@ -248,11 +248,25 @@ a{color:inherit;text-decoration:none}
 .fb-sel{flex-shrink:0;font-size:12.5px;padding:8px 11px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text);outline:0;cursor:pointer;min-height:36px;}
 :root[data-theme="dark"] .fb-sel{background:var(--surface-2,#1e293b);}
 :root[data-theme="dark"] .fb-sel option{background:var(--surface-2,#1e293b);color:var(--text);}
-.fb-search{flex:1;min-width:110px;display:flex;align-items:center;gap:6px;border:1px solid var(--border);border-radius:8px;padding:0 11px;background:var(--surface);min-height:36px;}
+.fb-search{flex-shrink:0;width:170px;display:flex;align-items:center;gap:6px;border:1px solid var(--border);border-radius:8px;padding:0 11px;background:var(--surface);min-height:36px;}
 :root[data-theme="dark"] .fb-search{background:var(--surface-2,#1e293b);}
 .fb-search .ico{width:14px;height:14px;color:var(--text-3);flex-shrink:0;}
 .fb-search input{flex:1;border:0;outline:0;background:transparent;font-size:12.5px;color:var(--text);padding:8px 0;}
 .filter-bar.onerow .btn-search,.filter-bar.onerow .btn-reset{flex-shrink:0;min-height:36px;}
+
+/* ⭐ 작은 칩 버튼 그룹 (분기/기종/수리유형) */
+.cgroup{display:inline-flex;gap:4px;flex-shrink:0;}
+.chip2{font-size:12px;padding:8px 11px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text-2);transition:background .12s,color .12s,border-color .12s;white-space:nowrap;}
+.chip2:hover{border-color:var(--border-strong);}
+.chip2.active{background:var(--primary);color:#fff;border-color:var(--primary);font-weight:600;}
+:root[data-theme="dark"] .chip2{background:var(--surface-2,#1e293b);}
+:root[data-theme="dark"] .chip2.active{background:var(--primary);color:#fff;}
+/* 날짜 지정 박스 */
+.fb-date{display:flex;align-items:center;gap:6px;border:1px solid var(--border);border-radius:8px;padding:0 10px;background:var(--surface);min-height:36px;flex-shrink:0;}
+:root[data-theme="dark"] .fb-date{background:var(--surface-2,#1e293b);}
+.fb-date .ico{width:14px;height:14px;color:var(--text-3);flex-shrink:0;}
+.fb-date input[type="date"]{border:0;outline:0;background:transparent;font-size:12px;color:var(--text);font-family:inherit;width:118px;}
+.fb-date .sep{color:var(--text-3);}
 /* ⭐ 다크모드 드롭다운 가독성 (어디에 있든 적용) */
 :root[data-theme="dark"] select,
 :root[data-theme="dark"] select option{background:var(--surface-2,#1e293b);color:var(--text,#e2e8f0);}
@@ -666,33 +680,42 @@ table.data tr:hover td{background:var(--hover-bg,#fafbfc)}
         <button class="seg-btn" data-period="thisMonth">이번 달</button>
         <button class="seg-btn" data-period="lastMonth">지난 달</button>
       </div>
+      <!-- 날짜 직접 지정 -->
+      <div class="fb-date">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+        <input type="date" id="f-date-from">
+        <span class="sep">~</span>
+        <input type="date" id="f-date-to">
+      </div>
       <span class="fb-div"></span>
       <!-- 출고연도 -->
       <select id="f-year" class="fb-sel" title="출고연도"><option value="all">연도 전체</option></select>
-      <!-- 출고분기 -->
-      <select id="f-quarter" class="fb-sel" title="출고분기">
-        <option value="all">분기 전체</option>
-        <option value="Q1">Q1</option>
-        <option value="Q2">Q2</option>
-        <option value="Q3">Q3</option>
-        <option value="Q4">Q4</option>
-      </select>
-      <!-- 기종 -->
-      <select id="f-model" class="fb-sel" title="기종">
-        <option value="all">기종 전체</option>
-        <option value="S2PRO_N">S2PRO_N</option>
-        <option value="S2_N">S2_N</option>
-      </select>
-      <!-- 수리유형 -->
-      <select id="f-worktype" class="fb-sel" title="수리유형">
-        <option value="all">수리유형 전체</option>
-        <option value="single">단일수리</option>
-        <option value="multi">복합수리</option>
-      </select>
-      <!-- 시리얼 검색 (남는 공간 채움) -->
+      <!-- 출고분기 칩 -->
+      <div class="cgroup" id="cg-quarter">
+        <button class="chip2 active" data-quarter="all">전체</button>
+        <button class="chip2" data-quarter="Q1">Q1</button>
+        <button class="chip2" data-quarter="Q2">Q2</button>
+        <button class="chip2" data-quarter="Q3">Q3</button>
+        <button class="chip2" data-quarter="Q4">Q4</button>
+      </div>
+      <span class="fb-div"></span>
+      <!-- 기종 칩 -->
+      <div class="cgroup" id="cg-model">
+        <button class="chip2 active" data-model="all">전체</button>
+        <button class="chip2" data-model="S2PRO_N">S2PRO_N</button>
+        <button class="chip2" data-model="S2_N">S2_N</button>
+      </div>
+      <span class="fb-div"></span>
+      <!-- 수리유형 칩 -->
+      <div class="cgroup" id="cg-worktype">
+        <button class="chip2 active" data-worktype="all">전체</button>
+        <button class="chip2" data-worktype="single">단일</button>
+        <button class="chip2" data-worktype="multi">복합</button>
+      </div>
+      <!-- 시리얼 검색 (고정폭) -->
       <div class="fb-search">
         <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-        <input type="text" id="f-serial" placeholder="시리얼번호 일부 입력">
+        <input type="text" id="f-serial" placeholder="시리얼 검색">
       </div>
       <!-- 조회 / 초기화 -->
       <button class="btn-search" id="btn-search">
@@ -703,9 +726,6 @@ table.data tr:hover td{background:var(--hover-bg,#fafbfc)}
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9"/><polyline points="3 4 3 9 8 9"/></svg>
         초기화
       </button>
-      <!-- 날짜 직접 지정 (숨김 유지 — 기간 버튼이 값 세팅) -->
-      <input type="date" id="f-date-from" style="display:none">
-      <input type="date" id="f-date-to" style="display:none">
     </div>
 
     <!-- Tabs -->
@@ -2384,21 +2404,52 @@ function bindEvents() {
     });
   });
 
-  // Inputs (드롭다운)
+  // 출고연도 (드롭다운 유지)
   document.getElementById('f-year').addEventListener('change', e => { state.filter.year = e.target.value; refresh(); });
-  document.getElementById('f-quarter').addEventListener('change', e => { state.filter.quarter = e.target.value; refresh(); });
-  document.getElementById('f-model').addEventListener('change', e => { state.filter.model = e.target.value; refresh(); });
-  document.getElementById('f-worktype').addEventListener('change', e => { state.filter.worktype = e.target.value; refresh(); });
+  // 분기 / 기종 / 수리유형 칩 그룹 — 공통 핸들러
+  const bindChipGroup = (groupId, attr, key) => {
+    const grp = document.getElementById(groupId);
+    if(!grp) return;
+    grp.querySelectorAll('.chip2').forEach(c => {
+      c.addEventListener('click', () => {
+        grp.querySelectorAll('.chip2').forEach(x => x.classList.remove('active'));
+        c.classList.add('active');
+        state.filter[key] = c.dataset[attr];
+        refresh();
+      });
+    });
+  };
+  bindChipGroup('cg-quarter', 'quarter', 'quarter');
+  bindChipGroup('cg-model', 'model', 'model');
+  bindChipGroup('cg-worktype', 'worktype', 'worktype');
+  // 시리얼 검색
   document.getElementById('f-serial').addEventListener('input', e => { state.filter.serial = e.target.value; });
   document.getElementById('f-serial').addEventListener('keydown', e => { if(e.key === 'Enter') refresh(); });
+  // 날짜 직접 지정 (선택 시 기간 세그먼트는 '전체'로 표시 해제 효과)
+  document.getElementById('f-date-from').addEventListener('change', e => {
+    state.filter.dateFrom = e.target.value;
+    state.filter.period = 'all';
+    document.querySelectorAll('.seg-btn[data-period]').forEach(x => x.classList.toggle('active', x.dataset.period === 'all'));
+    refresh();
+  });
+  document.getElementById('f-date-to').addEventListener('change', e => {
+    state.filter.dateTo = e.target.value;
+    state.filter.period = 'all';
+    document.querySelectorAll('.seg-btn[data-period]').forEach(x => x.classList.toggle('active', x.dataset.period === 'all'));
+    refresh();
+  });
 
   document.getElementById('btn-search').addEventListener('click', refresh);
   document.getElementById('btn-reset').addEventListener('click', () => {
     state.filter = { period:'all', quarter:'all', year:'all', dateFrom:'', dateTo:'', model:'all', yymm:'all', worktype:'all', serial:'' };
     document.querySelectorAll('.seg-btn[data-period]').forEach(c => c.classList.toggle('active', c.dataset.period === 'all'));
+    // 칩 그룹들 '전체'로 리셋
+    [['cg-quarter','quarter'],['cg-model','model'],['cg-worktype','worktype']].forEach(([gid]) => {
+      const grp = document.getElementById(gid);
+      if(grp) grp.querySelectorAll('.chip2').forEach(c => c.classList.toggle('active', c.dataset[gid.replace('cg-','')] === 'all'));
+    });
     const setVal = (id,v) => { const el = document.getElementById(id); if(el) el.value = v; };
-    setVal('f-year','all'); setVal('f-quarter','all'); setVal('f-model','all');
-    setVal('f-worktype','all'); setVal('f-serial','');
+    setVal('f-year','all'); setVal('f-serial','');
     setVal('f-date-from',''); setVal('f-date-to','');
     refresh();
   });
