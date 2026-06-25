@@ -1562,6 +1562,9 @@ function renderCostStruct() {
   const modelPartsAll = getNormalizedModelParts();
 
   let totalLabor = 0, totalParts = 0;
+  // ⭐ 논배터리분 분리 집계 (비용비교 탭은 논배터리 제외라 구분 필요)
+  let nonbatLabor = 0, nonbatParts = 0;
+  const KNOWN_LABOR = { pcb:15180, panel:10450, board:10450 }; // 비논배터리 공임 (forms-as 기준)
   // 부품 항목별 사용 집계 (세부 표시용)
   const partUsage = {}; // { pcb:{cnt, sum}, panel:{...}, board:{...}, nonbat:{...} }
   state.filtered.forEach(e => {
@@ -1569,6 +1572,14 @@ function renderCostStruct() {
     totalParts += partsValue(e);          // 부품 실제 원가 (modelParts)
     // 항목별 부품 집계
     const mp = modelPartsAll[normalizeModel(e.model)] || {};
+    const ws = new Set(e.works||[]);
+    // 논배터리 공임 = 전체 공임 - 알려진 비논배터리 공임 (나머지 = 논배터리)
+    let known = 0;
+    if(ws.has('pcb')) known += KNOWN_LABOR.pcb;
+    if(ws.has('panel')) known += KNOWN_LABOR.panel;
+    if(ws.has('board')) known += KNOWN_LABOR.board;
+    nonbatLabor += Math.max(0, Number(e.total||0) - known);
+    if(ws.has('nonbat')) nonbatParts += Number(mp.nonbat)||0;
     (e.works||[]).forEach(w => {
       const partPrice = Number(mp[w]) || 0;
       if(partPrice > 0) {
@@ -1579,6 +1590,8 @@ function renderCostStruct() {
     });
   });
   const grandTotal = totalLabor + totalParts;
+  const nonbatTotal = nonbatLabor + nonbatParts;          // 논배터리분 (업체비교 제외 대상)
+  const vendorTotal = Math.max(0, grandTotal - nonbatTotal); // 비논배터리분 (PCB·LCD·MB = 업체비교 대상)
   const totalMan = Math.round(grandTotal/10000);
   document.getElementById('cost-struct-total').textContent = fmt.num(totalMan)+'만원';
 
@@ -1619,7 +1632,19 @@ function renderCostStruct() {
       <div class="dist-pct">${fmt.pct(totalParts, grandTotal)}</div>
     </div>
     ${partDetailRows ? `<div style="margin-top:8px;padding-top:8px;border-top:1px dashed var(--border);">${partDetailRows}</div>` : ''}
+    <div style="margin-top:8px;padding-top:8px;border-top:1px dashed var(--border);">
+      <div style="display:flex;justify-content:space-between;font-size:11.5px;padding:3px 0;">
+        <span style="color:#3b82f6;font-weight:600;">🔋 논배터리 작업분</span>
+        <span style="color:var(--text-2);font-weight:600;">${fmt.num(Math.round(nonbatTotal/10000))}만원</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:11.5px;padding:3px 0;">
+        <span style="color:#10b981;font-weight:600;">🔧 PCB·LCD·MB 등 (업체비교 대상)</span>
+        <span style="color:var(--text-2);font-weight:600;">${fmt.num(Math.round(vendorTotal/10000))}만원</span>
+      </div>
+    </div>
     <div style="margin-top:10px;padding-top:8px;border-top:1px dashed var(--border);font-size:10.5px;color:var(--text-3);line-height:1.6;">
+      ※ 총 비용은 <b>논배터리 작업 포함 전체</b> 기준입니다.<br>
+      ※ '업체별 수리비 비교' 탭은 타사에서 불가한 <b>논배터리를 제외</b>하고 PCB·LCD·MB만 비교하므로 금액이 다릅니다.<br>
       ※ 한 건당 표준 부품만 산정 (부품 불량으로 인한 추가 사용량 제외)<br>
       ※ 일부 작업(Wi-Fi 등)은 공임 미책정으로 비용에 미반영
     </div>
