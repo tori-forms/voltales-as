@@ -1276,7 +1276,7 @@ function applyFilter() {
         if(from && d < from) return false;
         if(to && d > to) return false;
       }
-      if(f.model !== 'all' && e.model !== f.model) return false;
+      if(f.model !== 'all' && normalizeModel(e.model) !== normalizeModel(f.model)) return false;
       if(f.worktype !== 'all') {
         const wlen = (e.works||[]).length;
         if(f.worktype === 'single' && wlen > 1) return false;
@@ -1310,7 +1310,7 @@ function applyFilter() {
       if(from && d < from) return false;
       if(to && d > to) return false;
     }
-    if(f.model !== 'all' && s.model !== f.model) return false;
+    if(f.model !== 'all' && normalizeModel(s.model) !== normalizeModel(f.model)) return false;
     if(f.serial && !String(s.serial).toLowerCase().includes(f.serial.toLowerCase())) return false;
     return true;
   });
