@@ -234,6 +234,53 @@ a{color:inherit;text-decoration:none}
 }
 .btn-reset:hover{background:#f8fafc}
 .filter-actions{display:flex;flex-direction:row;gap:8px;align-items:center;flex-basis:100%;justify-content:flex-end;margin-top:2px}
+
+/* ⭐ 토스 스타일 칩 요약 줄 */
+.filter-chips{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px;}
+.fchip{
+  display:inline-flex;align-items:center;gap:5px;
+  font-size:13px;padding:8px 14px;border-radius:9999px;cursor:pointer;
+  border:0.5px solid var(--border);background:var(--surface);color:var(--text-2);
+  transition:background .12s,border-color .12s;
+}
+.fchip:hover{border-color:var(--border-strong);}
+.fchip.on{background:var(--primary);color:#fff;border-color:var(--primary);font-weight:500;}
+.fchip .cv{font-weight:600;}
+:root[data-theme="dark"] .fchip{background:var(--surface-2,#1e293b);}
+.fchip-more{color:var(--text-3);}
+
+/* 바텀시트 오버레이 */
+.sheet-overlay{
+  position:fixed;inset:0;z-index:1000;
+  background:rgba(15,23,42,.45);
+  display:flex;align-items:flex-end;justify-content:center;
+  opacity:0;pointer-events:none;transition:opacity .2s;
+}
+.sheet-overlay.open{opacity:1;pointer-events:auto;}
+.sheet{
+  width:100%;max-width:720px;max-height:82vh;overflow-y:auto;
+  background:var(--surface);border-radius:18px 18px 0 0;
+  padding:8px 20px 24px;
+  transform:translateY(100%);transition:transform .24s cubic-bezier(.32,.72,0,1);
+  box-shadow:0 -8px 40px rgba(0,0,0,.18);
+}
+.sheet-overlay.open .sheet{transform:translateY(0);}
+.sheet-handle{width:38px;height:4px;background:var(--border-strong,#cbd5e1);border-radius:9999px;margin:8px auto 14px;}
+.sheet-title{font-size:16px;font-weight:700;color:var(--text);margin-bottom:4px;}
+.sheet-sub{font-size:12px;color:var(--text-3);margin-bottom:16px;}
+.sheet-section{margin-bottom:18px;}
+.sheet-section > .sl{font-size:12px;color:var(--text-3);font-weight:600;margin-bottom:8px;display:block;}
+.sheet-row{display:flex;align-items:center;gap:7px;flex-wrap:wrap;}
+.sheet-actions{display:flex;gap:8px;margin-top:6px;position:sticky;bottom:0;background:var(--surface);padding-top:12px;}
+.btn-apply{flex:1;background:var(--primary);color:#fff;font-weight:600;font-size:14px;padding:12px 0;border-radius:10px;}
+.btn-apply:hover{background:var(--primary-2);}
+.btn-sheet-reset{background:var(--surface-2,#f1f5f9);color:var(--text-2);font-weight:500;font-size:14px;padding:12px 18px;border-radius:10px;border:0.5px solid var(--border);}
+:root[data-theme="dark"] .btn-sheet-reset{background:var(--surface-2,#1e293b);}
+.sheet-date{display:flex;align-items:center;gap:8px;background:var(--surface-2,#f8fafc);border:0.5px solid var(--border);border-radius:8px;padding:8px 12px;}
+:root[data-theme="dark"] .sheet-date{background:var(--surface-2,#1e293b);}
+.sheet-date input{border:0;outline:0;background:transparent;color:var(--text);font-size:13px;font-family:inherit;}
+.sheet-serial{width:100%;border:0.5px solid var(--border);border-radius:8px;padding:10px 12px;font-size:13px;background:var(--surface-2,#f8fafc);color:var(--text);outline:0;box-sizing:border-box;}
+:root[data-theme="dark"] .sheet-serial{background:var(--surface-2,#1e293b);}
 /* ⭐ 다크모드 드롭다운 가독성 (어디에 있든 적용) */
 :root[data-theme="dark"] select,
 :root[data-theme="dark"] select option{background:var(--surface-2,#1e293b);color:var(--text,#e2e8f0);}
@@ -639,67 +686,84 @@ table.data tr:hover td{background:var(--hover-bg,#fafbfc)}
       </div>
     </header>
 
-    <!-- Filter bar -->
-    <div class="filter-bar">
-      <button class="chip active" data-period="all">전체</button>
-      <button class="chip" data-period="thisMonth">이번 달</button>
-      <button class="chip" data-period="lastMonth">지난 달</button>
+    <!-- Filter: 칩 요약 줄 (토스 스타일) -->
+    <div class="filter-chips" id="filter-chips">
+      <span class="fchip" data-sheet="period"><i style="display:none"></i><span class="cl">기간</span> · <span class="cv" id="chip-period-v">전체</span> <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m6 9 6 6 6-6"/></svg></span>
+      <span class="fchip" data-sheet="quarter"><span class="cl">출고</span> <span class="cv" id="chip-quarter-v">전체</span> <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m6 9 6 6 6-6"/></svg></span>
+      <span class="fchip" data-sheet="model"><span class="cl">기종</span> <span class="cv" id="chip-model-v">전체</span> <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m6 9 6 6 6-6"/></svg></span>
+      <span class="fchip fchip-more" data-sheet="more">더보기 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M12 5v14"/></svg></span>
+    </div>
 
-      <div class="filter-group">
-        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
-        <span>출고연도</span>
-        <select id="f-year"><option value="all">전체</option></select>
-        <span style="color:var(--text-3);margin:0 2px 0 8px;">분기</span>
-        <button class="chip active" data-quarter="all" style="padding:3px 10px;font-size:12px">전체</button>
-        <button class="chip" data-quarter="Q1" style="padding:3px 10px;font-size:12px">Q1</button>
-        <button class="chip" data-quarter="Q2" style="padding:3px 10px;font-size:12px">Q2</button>
-        <button class="chip" data-quarter="Q3" style="padding:3px 10px;font-size:12px">Q3</button>
-        <button class="chip" data-quarter="Q4" style="padding:3px 10px;font-size:12px">Q4</button>
-      </div>
+    <!-- Filter: 바텀시트 -->
+    <div class="sheet-overlay" id="filter-sheet">
+      <div class="sheet" onclick="event.stopPropagation()">
+        <div class="sheet-handle"></div>
+        <div class="sheet-title">조회 필터</div>
+        <div class="sheet-sub">원하는 조건을 선택하고 적용을 누르세요.</div>
 
-      <div class="filter-group">
-        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
-        <span>기간</span>
-        <input type="date" id="f-date-from">
-        <span class="sep">~</span>
-        <input type="date" id="f-date-to">
-      </div>
+        <div class="sheet-section">
+          <span class="sl">기간</span>
+          <div class="sheet-row">
+            <button class="chip active" data-period="all">전체</button>
+            <button class="chip" data-period="thisMonth">이번 달</button>
+            <button class="chip" data-period="lastMonth">지난 달</button>
+          </div>
+          <div class="sheet-date" style="margin-top:8px;">
+            <svg class="ico" style="width:14px;height:14px;color:var(--text-3)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+            <input type="date" id="f-date-from">
+            <span class="sep" style="color:var(--text-3)">~</span>
+            <input type="date" id="f-date-to">
+          </div>
+        </div>
 
-      <div class="filter-group">
-        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="2" width="12" height="20" rx="2"/><circle cx="12" cy="18" r="0.5" fill="currentColor"/></svg>
-        <span>기종</span>
-        <button class="chip active" data-model="all" style="padding:3px 10px;font-size:12px">전체</button>
-        <button class="chip" data-model="S2PRO_N" style="padding:3px 10px;font-size:12px">S2PRO_N</button>
-        <button class="chip" data-model="S2_N" style="padding:3px 10px;font-size:12px">S2_N</button>
-        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-left:16px"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
-        <span>제조년월</span>
-        <select id="f-yymm"><option value="all">전체</option></select>
-      </div>
+        <div class="sheet-section">
+          <span class="sl">출고연도 / 출고분기</span>
+          <div class="sheet-row">
+            <select id="f-year" style="padding:7px 10px;border:0.5px solid var(--border);border-radius:8px;"><option value="all">전체 연도</option></select>
+            <button class="chip active" data-quarter="all">전체</button>
+            <button class="chip" data-quarter="Q1">Q1</button>
+            <button class="chip" data-quarter="Q2">Q2</button>
+            <button class="chip" data-quarter="Q3">Q3</button>
+            <button class="chip" data-quarter="Q4">Q4</button>
+          </div>
+        </div>
 
-      <div class="filter-group">
-        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-        <span>수리유형</span>
-        <select id="f-worktype">
-          <option value="all">전체</option>
-          <option value="single">단일수리</option>
-          <option value="multi">복합수리</option>
-        </select>
-      </div>
+        <div class="sheet-section">
+          <span class="sl">기종</span>
+          <div class="sheet-row">
+            <button class="chip active" data-model="all">전체</button>
+            <button class="chip" data-model="S2PRO_N">S2PRO_N</button>
+            <button class="chip" data-model="S2_N">S2_N</button>
+          </div>
+        </div>
 
-      <div class="filter-group">
-        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-        <input type="text" id="f-serial" placeholder="시리얼번호 일부 입력">
-      </div>
+        <div class="sheet-section">
+          <span class="sl">제조년월</span>
+          <div class="sheet-row">
+            <select id="f-yymm" style="padding:7px 10px;border:0.5px solid var(--border);border-radius:8px;"><option value="all">전체</option></select>
+          </div>
+        </div>
 
-      <div class="filter-actions">
-        <button class="btn-search" id="btn-search">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-          조회
-        </button>
-        <button class="btn-reset" id="btn-reset">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9"/><polyline points="3 4 3 9 8 9"/></svg>
-          초기화
-        </button>
+        <div class="sheet-section">
+          <span class="sl">수리유형</span>
+          <div class="sheet-row">
+            <select id="f-worktype" style="padding:7px 10px;border:0.5px solid var(--border);border-radius:8px;">
+              <option value="all">전체</option>
+              <option value="single">단일수리</option>
+              <option value="multi">복합수리</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="sheet-section">
+          <span class="sl">시리얼번호</span>
+          <input type="text" id="f-serial" class="sheet-serial" placeholder="시리얼번호 일부 입력">
+        </div>
+
+        <div class="sheet-actions">
+          <button class="btn-sheet-reset" id="btn-reset">초기화</button>
+          <button class="btn-apply" id="btn-search">적용</button>
+        </div>
       </div>
     </div>
 
@@ -917,6 +981,7 @@ table.data tr:hover td{background:var(--hover-bg,#fafbfc)}
             <div class="pct-pill" id="ven-save-pct">— 절감</div>
           </div>
         </div>
+        <div id="ven-itemized" style="margin-top:14px;"></div>
         <div class="chart-wrap" style="height:300px;margin-top:14px"><canvas id="chart-vendor"></canvas></div>
         <div style="margin-top:10px;padding-top:8px;border-top:1px dashed var(--border);font-size:10.5px;color:var(--text-3);line-height:1.6;">
           ※ 한 건당 표준 부품만 산정 (부품 불량으로 인한 추가 사용량 제외)<br>
@@ -1981,6 +2046,28 @@ function renderCost() {
   const estData = labels.map(k => buckets[k].c > 0 ? Math.round(buckets[k].e/buckets[k].c) : 0);
   const actData = labels.map(k => buckets[k].c > 0 ? Math.round(buckets[k].a/buckets[k].c) : 0);
 
+  // ⭐ 작업별 단가 텍스트 비교 (PCB 교체 OO원 / LCD 교체 OO원 / MB수리 OO원)
+  const itemEl = document.getElementById('ven-itemized');
+  if(itemEl) {
+    const rows = labels.map((k, i) => {
+      const est = estData[i], act = actData[i], cnt = buckets[k].c;
+      if(cnt === 0) return '';
+      const diff = est - act;
+      return `<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 12px;border:1px solid var(--border);border-radius:8px;">
+        <span style="font-weight:600;font-size:13px;color:var(--text);min-width:72px;">${k}</span>
+        <span style="display:flex;gap:14px;align-items:baseline;flex-wrap:wrap;justify-content:flex-end;font-size:12.5px;">
+          <span style="color:var(--text-3);">태클라스트 <b style="color:#ef4444;">${fmt.num(est)}원</b></span>
+          <span style="color:var(--text-3);">볼타레스 <b style="color:#10b981;">${fmt.num(act)}원</b></span>
+          <span style="color:var(--text-3);">건당 절감 <b style="color:var(--text);">${fmt.num(diff)}원</b></span>
+          <span style="color:var(--text-3);font-size:11px;">(${cnt}건)</span>
+        </span>
+      </div>`;
+    }).join('');
+    itemEl.innerHTML = `
+      <div style="font-size:12px;color:var(--text-2);font-weight:600;margin-bottom:8px;">작업별 단가 비교 <span style="color:var(--text-3);font-weight:400;">· 1건당 평균</span></div>
+      <div style="display:flex;flex-direction:column;gap:6px;">${rows || '<div style="color:var(--text-3);font-size:12px;">데이터 없음</div>'}</div>`;
+  }
+
   destroyChart('vendor');
   state.charts.vendor = new Chart(document.getElementById('chart-vendor'), {
     type:'bar',
@@ -2418,6 +2505,16 @@ function bindEvents() {
 
   document.getElementById('btn-export').addEventListener('click', exportExcel);
 
+  // ── 토스 스타일: 칩 클릭 → 바텀시트 열기 ──
+  document.querySelectorAll('.fchip[data-sheet]').forEach(c => {
+    c.addEventListener('click', () => openFilterSheet());
+  });
+  // 오버레이(배경) 클릭 시 닫기
+  const overlay = document.getElementById('filter-sheet');
+  overlay.addEventListener('click', () => closeFilterSheet());
+  // 적용 버튼 = 닫기 (refresh는 기존 btn-search 핸들러가 이미 함)
+  document.getElementById('btn-search').addEventListener('click', () => closeFilterSheet());
+
   // ── 라이트/다크 모드 토글 ──
   document.getElementById('theme-toggle').addEventListener('click', () => {
     const cur = document.documentElement.getAttribute('data-theme') || 'light';
@@ -2471,6 +2568,35 @@ function refreshYYMMOptions() {
   }
 }
 
+/* ⭐ 토스 스타일 바텀시트 제어 */
+function openFilterSheet() {
+  document.getElementById('filter-sheet').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+function closeFilterSheet() {
+  document.getElementById('filter-sheet').classList.remove('open');
+  document.body.style.overflow = '';
+}
+/* 상단 칩 요약 텍스트 갱신 */
+function updateFilterChips() {
+  const f = state.filter;
+  const periodMap = { all:'전체', thisMonth:'이번 달', lastMonth:'지난 달' };
+  let periodTxt = periodMap[f.period] || '전체';
+  if(f.dateFrom || f.dateTo) periodTxt = `${f.dateFrom||'…'}~${f.dateTo||'…'}`;
+  const pv = document.getElementById('chip-period-v'); if(pv) pv.textContent = periodTxt;
+  let qTxt = (f.year && f.year!=='all') ? `${f.year}년` : '';
+  if(f.quarter && f.quarter!=='all') qTxt += (qTxt?' ':'') + f.quarter;
+  if(!qTxt) qTxt = '전체';
+  const qv = document.getElementById('chip-quarter-v'); if(qv) qv.textContent = qTxt;
+  const mv = document.getElementById('chip-model-v'); if(mv) mv.textContent = (f.model && f.model!=='all') ? f.model : '전체';
+  const setOn = (sheet, on) => { const el = document.querySelector(`.fchip[data-sheet="${sheet}"]`); if(el) el.classList.toggle('on', on); };
+  setOn('period', f.period!=='all' || !!f.dateFrom || !!f.dateTo);
+  setOn('quarter', (f.year&&f.year!=='all') || (f.quarter&&f.quarter!=='all'));
+  setOn('model', f.model&&f.model!=='all');
+  const moreOn = (f.yymm&&f.yymm!=='all') || (f.worktype&&f.worktype!=='all') || !!f.serial;
+  setOn('more', moreOn);
+}
+
 function refresh() {
   state.shippingPage = 1; // 필터 변경 시 페이지 초기화
   applyFilter();
@@ -2492,6 +2618,7 @@ function refresh() {
   if(activeTab === 'shipping') renderShipping();
   if(activeTab === 'cost') renderCost();
   if(activeTab === 'alerts') renderAlerts();
+  updateFilterChips();
 }
 
 async function init() {
