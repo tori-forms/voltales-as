@@ -636,7 +636,9 @@ table.data tr:hover td{background:var(--hover-bg,#fafbfc)}
       <button class="chip active" data-period="all">전체</button>
       <button class="chip" data-period="thisMonth">이번 달</button>
       <button class="chip" data-period="lastMonth">지난 달</button>
-      <span style="margin:0 4px 0 12px;color:var(--text2);font-size:13px;align-self:center;">분기:</span>
+      <span style="margin:0 4px 0 12px;color:var(--text2);font-size:13px;align-self:center;">출고연도:</span>
+      <select id="f-year" style="align-self:center;"><option value="all">전체</option></select>
+      <span style="margin:0 4px 0 12px;color:var(--text2);font-size:13px;align-self:center;">출고분기:</span>
       <button class="chip active" data-quarter="all">전체</button>
       <button class="chip" data-quarter="Q1">Q1</button>
       <button class="chip" data-quarter="Q2">Q2</button>
@@ -968,6 +970,7 @@ const state = {
   filter: {
     period: 'all',
     quarter: 'all',
+    year: 'all',
     dateFrom: '',
     dateTo: '',
     model: 'all',
@@ -1223,6 +1226,23 @@ function generateDemoData() {
 /* ═══════════════════════════════════════════════════════════════
  *  FILTER
  * ═════════════════════════════════════════════════════════════ */
+/* ⭐ 출고연도 드롭다운 옵션 채우기 (출고이력 기준) */
+function populateYearOptions() {
+  const sel = document.getElementById('f-year');
+  if(!sel) return;
+  const shipLog = (state.raw && state.raw.shipLog) || [];
+  const years = new Set();
+  shipLog.forEach(s => {
+    if(!s.shipDate) return;
+    const d = new Date(s.shipDate);
+    if(!isNaN(d.getTime())) years.add(d.getFullYear());
+  });
+  const sorted = Array.from(years).sort((a,b) => b - a); // 최신 연도 먼저
+  sel.innerHTML = '<option value="all">전체</option>' +
+    sorted.map(y => `<option value="${y}">${y}년</option>`).join('');
+  sel.value = state.filter.year || 'all';
+}
+
 function applyFilter() {
   const f = state.filter;
   const all = state.raw.entries || [];
@@ -1250,16 +1270,22 @@ function applyFilter() {
     }
   }
 
-  // 분기(제조년월 기준) 필터 헬퍼 - f.quarter 참조 (기간과 독립적)
+  // ⭐ 분기(Q1~Q4) + 연도 필터 — 출고일(shipDate) 기준
   const QUARTER_RANGES = {Q1:[1,3], Q2:[4,6], Q3:[7,9], Q4:[10,12]};
   const isQuarter = ['Q1','Q2','Q3','Q4'].includes(f.quarter);
-  const checkQuarter = (serial) => {
-    if(!isQuarter) return true;
-    const ym = extractYYMM(serial);
-    if(!ym) return false;
-    const m = parseInt(ym.slice(5));
-    const [start, end] = QUARTER_RANGES[f.quarter];
-    return m >= start && m <= end;
+  const hasYear = f.year && f.year !== 'all';
+  const checkQuarter = (shipDate) => {
+    if(!isQuarter && !hasYear) return true;
+    if(!shipDate) return false;
+    const d = new Date(shipDate);
+    if(isNaN(d.getTime())) return false;
+    if(hasYear && d.getFullYear() !== Number(f.year)) return false;
+    if(isQuarter) {
+      const m = d.getMonth() + 1;
+      const [start, end] = QUARTER_RANGES[f.quarter];
+      if(m < start || m > end) return false;
+    }
+    return true;
   };
 
   // 출고일 기준 1차 필터링 (yymm 제외 - 드롭다운 옵션 추출용)
@@ -1268,8 +1294,8 @@ function applyFilter() {
     .filter(e => {
       // 출고된 것만
       if(!e.shipDate) return false;
-      // 분기 필터 (제조년월 기준)
-      if(!checkQuarter(e.serial)) return false;
+      // 분기/연도 필터 (출고일 기준)
+      if(!checkQuarter(e.shipDate)) return false;
       // 출고일 기간 필터
       if(from || to) {
         const d = new Date(e.shipDate);
@@ -1301,8 +1327,8 @@ function applyFilter() {
 
   // 출고이력 필터링 (모델 + 시리얼 + 날짜 + 분기)
   state.filteredShip = shipLog.filter(s => {
-    // 분기 필터 (제조년월 기준)
-    if(!checkQuarter(s.serial)) return false;
+    // 분기/연도 필터 (출고일 기준)
+    if(!checkQuarter(s.shipDate)) return false;
     // 날짜 필터 (출고일자 기준)
     if(from || to) {
       if(!s.shipDate) return false; // 출고일 없으면 제외
@@ -2342,6 +2368,7 @@ function bindEvents() {
 
   // Inputs
   document.getElementById('f-yymm').addEventListener('change', e => { state.filter.yymm = e.target.value; refresh(); });
+  document.getElementById('f-year').addEventListener('change', e => { state.filter.year = e.target.value; refresh(); });
   document.getElementById('f-worktype').addEventListener('change', e => { state.filter.worktype = e.target.value; refresh(); });
   document.getElementById('f-serial').addEventListener('input', e => { state.filter.serial = e.target.value; });
   document.getElementById('f-date-from').addEventListener('change', e => { state.filter.dateFrom = e.target.value; });
@@ -2349,10 +2376,11 @@ function bindEvents() {
 
   document.getElementById('btn-search').addEventListener('click', refresh);
   document.getElementById('btn-reset').addEventListener('click', () => {
-    state.filter = { period:'all', quarter:'all', dateFrom:'', dateTo:'', model:'all', yymm:'all', worktype:'all', serial:'' };
+    state.filter = { period:'all', quarter:'all', year:'all', dateFrom:'', dateTo:'', model:'all', yymm:'all', worktype:'all', serial:'' };
     document.querySelectorAll('.chip[data-period]').forEach(c => c.classList.toggle('active', c.dataset.period === 'all'));
     document.querySelectorAll('.chip[data-quarter]').forEach(c => c.classList.toggle('active', c.dataset.quarter === 'all'));
     document.querySelectorAll('.chip[data-model]').forEach(c => c.classList.toggle('active', c.dataset.model === 'all'));
+    const yearSel = document.getElementById('f-year'); if(yearSel) yearSel.value = 'all';
     document.getElementById('f-yymm').value = 'all';
     document.getElementById('f-worktype').value = 'all';
     document.getElementById('f-serial').value = '';
@@ -2446,6 +2474,9 @@ async function init() {
 
   try {
     state.raw = await loadData();
+
+    // ⭐ 출고연도 드롭다운 채우기 (출고이력의 연도 추출)
+    populateYearOptions();
 
     // ════ 디버그 로그 (자동 출력) ════
     console.log('═══════════ [voltales-as 진단 정보] ═══════════');
