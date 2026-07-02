@@ -95,6 +95,9 @@ a{color:inherit;text-decoration:none}
 
 /* ─────────────── Layout ─────────────── */
 .layout{display:grid;grid-template-columns:220px minmax(0,1fr);min-height:100vh}
+body{overflow-x:hidden}
+canvas,img{max-width:100%}
+.chart-wrap{max-width:100%;overflow:hidden}
 
 /* ─────────────── Sidebar ─────────────── */
 .sidebar{
@@ -1026,9 +1029,18 @@ table.data tr:hover td{background:var(--hover-bg,#fafbfc)}
         <div style="padding:0 16px 4px;font-size:11.5px;color:var(--text-3);line-height:1.6;">
           💡 각 수리건에 어떤 부품이 사용됐는지 보여드립니다. (수량은 표시하지 않습니다)
         </div>
+        <div style="display:flex;gap:8px;align-items:center;padding:6px 16px 10px;flex-wrap:wrap;">
+          <select id="pe-model" onchange="renderPartsEntries()" style="height:32px;padding:0 10px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text);font-size:12.5px;">
+            <option value="">기종 전체</option>
+          </select>
+          <select id="pe-part" onchange="renderPartsEntries()" style="height:32px;padding:0 10px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text);font-size:12.5px;max-width:260px;">
+            <option value="">부품 전체</option>
+          </select>
+          <button onclick="exportPartsEntriesCSV()" style="height:32px;padding:0 14px;border:none;border-radius:8px;background:#10b981;color:#fff;font-size:12.5px;font-weight:600;cursor:pointer;">⬇ 엑셀(CSV) 내보내기</button>
+        </div>
         <div class="table-wrap">
           <table class="data" id="parts-entries-table">
-            <thead><tr><th>시리얼</th><th>기종</th><th>입고일</th><th>수리 항목</th><th>사용 부품</th></tr></thead>
+            <thead><tr><th>시리얼</th><th>기종</th><th>수리 항목</th><th>사용 부품</th></tr></thead>
             <tbody id="parts-entries-tbody"></tbody>
           </table>
         </div>
@@ -2044,10 +2056,16 @@ function renderExchange() {
     </tr>`).join('');
 }
 
+function _isConsumablePart(stockItem) {
+  // 소모성: 재고 체크박스(consumable=1) 또는 이름에 '필름' 포함 (필름·보호지류)
+  if(!stockItem) return false;
+  if(Number(stockItem.consumable) === 1) return true;
+  return /필름/.test(String(stockItem.name||''));
+}
+
 function renderParts() {
   const stock = (state.raw && state.raw.stock) || [];
   const stockLog = (state.raw && state.raw.stockLog) || [];
-  const entries = state.filtered || state.raw.entries || [];
 
   // ── 1) 재고 현황 (전체, 소모성 포함, 기종별 그룹) ──
   const stockListEl = document.getElementById('parts-stock-list');
@@ -2056,38 +2074,38 @@ function renderParts() {
       stockListEl.innerHTML = `<div style="color:var(--text-3);font-size:13px;padding:12px 0;">재고 데이터가 없습니다.</div>`;
     } else {
       const groups = {};
-      stock.forEach(s => { const m = s.model || '공용'; (groups[m] = groups[m]||[]).push(s); });
+      stock.forEach(st => { const m = st.model || '공용'; (groups[m] = groups[m]||[]).push(st); });
       const modelOrder = Object.keys(groups).sort((a,b) => a==='공용' ? -1 : b==='공용' ? 1 : a.localeCompare(b));
       stockListEl.innerHTML = modelOrder.map(m => `
         <div style="margin-bottom:10px;">
           <div style="font-size:12px;font-weight:700;color:var(--text-2);margin-bottom:4px;">${_escP(m)}</div>
-          ${groups[m].map(s => {
-            const low = s.minQty && s.qty <= s.minQty;
+          ${groups[m].map(st => {
+            const low = st.minQty && st.qty <= st.minQty;
             return `<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 8px;border-radius:6px;${low?'background:rgba(239,68,68,.08);':''}font-size:12.5px;">
-              <span>${_escP(s.name)}</span>
-              <span style="font-weight:700;${low?'color:#ef4444;':'color:var(--text-1);'}">${fmt.num(s.qty)}개${low?' ⚠️':''}</span>
+              <span>${_escP(st.name)}</span>
+              <span style="font-weight:700;${low?'color:#ef4444;':'color:var(--text-1);'}">${fmt.num(st.qty)}개${low?' ⚠️':''}</span>
             </div>`;
           }).join('')}
         </div>`).join('');
     }
   }
 
-  // ── 2) 부품 사용량 (누적, 소모성 제외 — consumable 플래그 대응 예정) ──
+  // ── 2) 부품 사용량 (누적) — 재고 등록 부품만 · 소모성 제외 ──
   const usageListEl = document.getElementById('parts-usage-list');
   const usageTotalEl = document.getElementById('parts-usage-total');
   if(usageListEl) {
     const stockByName = {};
-    stock.forEach(s => { stockByName[String(s.name).trim().toLowerCase()] = s; });
+    stock.forEach(st => { stockByName[String(st.name).trim().toLowerCase()] = st; });
     const usage = {};
     stockLog.forEach(l => {
       if(l.type !== 'out') return;
-      const s = stockByName[String(l.partName||'').trim().toLowerCase()];
-      if(s && s.consumable) return;   // ⭐ 소모성 부품 제외 (재고 등록 시 체크된 것)
-      const key = l.partName || '(이름없음)';
-      usage[key] = (usage[key]||0) + (Number(l.qty)||0);
+      const st = stockByName[String(l.partName||'').trim().toLowerCase()];
+      if(!st) return;                     // ⭐ 재고 미등록(옛이름) 제외
+      if(_isConsumablePart(st)) return;   // ⭐ 소모성(필름 등) 제외
+      usage[st.name] = (usage[st.name]||0) + (Number(l.qty)||0);
     });
     const sorted = Object.entries(usage).sort((a,b) => b[1]-a[1]);
-    const total = sorted.reduce((s,[,v])=>s+v, 0);
+    const total = sorted.reduce((sm,[,v])=>sm+v, 0);
     if(usageTotalEl) usageTotalEl.textContent = total ? `${fmt.num(total)}개` : '—';
     usageListEl.innerHTML = sorted.length ? sorted.map(([name, qty]) => `
       <div style="display:flex;justify-content:space-between;align-items:center;padding:5px 8px;font-size:12.5px;">
@@ -2096,26 +2114,69 @@ function renderParts() {
       </div>`).join('') : `<div style="color:var(--text-3);font-size:13px;padding:12px 0;">집계할 사용 이력이 없습니다.</div>`;
   }
 
-  // ── 3) 건별 사용 부품 (수량 미표기, 최신순 최대 200건) ──
+  // ── 3) 건별 필터 옵션 채우기 + 렌더 ──
+  const mSel = document.getElementById('pe-model');
+  const pSel = document.getElementById('pe-part');
+  if(mSel && mSel.options.length <= 1) {
+    [...new Set(stock.map(st => st.model).filter(m => m && m !== '공용'))].sort()
+      .forEach(m => { const o=document.createElement('option'); o.value=m; o.textContent=m; mSel.appendChild(o); });
+  }
+  if(pSel && pSel.options.length <= 1) {
+    stock.slice().sort((a,b)=>String(a.name).localeCompare(String(b.name)))
+      .forEach(st => { const o=document.createElement('option'); o.value=st.name; o.textContent=st.name; pSel.appendChild(o); });
+  }
+  renderPartsEntries();
+}
+
+// 건별 사용 부품 — 재고 등록 부품만 표시(옛이름·소모성 제외), 기종/부품 필터
+function _peRows() {
+  const stock = (state.raw && state.raw.stock) || [];
+  const entries = state.filtered || state.raw.entries || [];
+  const stockByName = {};
+  stock.forEach(st => { stockByName[String(st.name).trim().toLowerCase()] = st; });
+  const fModel = document.getElementById('pe-model')?.value || '';
+  const fPart = document.getElementById('pe-part')?.value || '';
+  return entries
+    .map(e => {
+      const parts = Object.keys(_parsePartsObj(e.parts))
+        .map(n => stockByName[String(n).trim().toLowerCase()])
+        .filter(st => st && !_isConsumablePart(st))
+        .map(st => st.name);
+      return { serial: e.serial||'-', model: e.model||'-', works: (e.works||[]).map(w=>workName(w)).join(', '), date: e.date, parts: [...new Set(parts)] };
+    })
+    .filter(r => r.parts.length)
+    .filter(r => !fModel || r.model === fModel)
+    .filter(r => !fPart || r.parts.includes(fPart))
+    .sort((a,b) => new Date(b.date) - new Date(a.date));
+}
+
+function renderPartsEntries() {
   const tbody = document.getElementById('parts-entries-tbody');
   const countEl = document.getElementById('parts-entries-count');
-  if(tbody) {
-    const withParts = entries
-      .map(e => ({ ...e, _p: _parsePartsObj(e.parts) }))
-      .filter(e => Object.keys(e._p).length);
-    if(countEl) countEl.textContent = `${fmt.num(withParts.length)}건`;
-    const rows = withParts
-      .slice().sort((a,b) => new Date(b.date) - new Date(a.date))
-      .slice(0, 200);
-    tbody.innerHTML = rows.length ? rows.map(e => `
-      <tr>
-        <td style="font-family:monospace;">${_escP(e.serial||'-')}</td>
-        <td>${_escP(e.model||'-')}</td>
-        <td>${fmt.date(e.date)}</td>
-        <td>${(e.works||[]).map(w=>workName(w)).join(', ')}</td>
-        <td style="text-align:left;">${Object.keys(e._p).map(n=>_escP(n)).join(', ')}</td>
-      </tr>`).join('') : `<tr><td colspan="5" style="text-align:center;color:var(--text-3);padding:20px;">부품 사용 내역이 없습니다.</td></tr>`;
-  }
+  if(!tbody) return;
+  const rows = _peRows();
+  if(countEl) countEl.textContent = `${fmt.num(rows.length)}건`;
+  tbody.innerHTML = rows.length ? rows.slice(0, 300).map(r => `
+    <tr>
+      <td style="font-family:monospace;">${_escP(r.serial)}</td>
+      <td>${_escP(r.model)}</td>
+      <td>${_escP(r.works)}</td>
+      <td style="text-align:left;">${r.parts.map(n=>_escP(n)).join(', ')}</td>
+    </tr>`).join('') : `<tr><td colspan="4" style="text-align:center;color:var(--text-3);padding:20px;">조건에 맞는 부품 사용 내역이 없습니다.</td></tr>`;
+}
+
+function exportPartsEntriesCSV() {
+  const rows = _peRows();
+  if(!rows.length) { alert('내보낼 내역이 없습니다.'); return; }
+  const head = '시리얼,기종,수리 항목,사용 부품';
+  const body = rows.map(r => [r.serial, r.model, `"${r.works}"`, `"${r.parts.join(', ')}"`].join(','));
+  const csv = '\uFEFF' + [head, ...body].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `건별사용부품_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(a.href);
 }
 
 function renderCost() {
