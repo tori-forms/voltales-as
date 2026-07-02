@@ -637,6 +637,10 @@ table.data tr:hover td{background:var(--hover-bg,#fafbfc)}
         <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
         <span>비용 비교</span>
       </button>
+      <button class="sb-item" data-tab="parts">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>
+        <span>부품 현황</span>
+      </button>
       <button class="sb-item" data-tab="alerts">
         <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
         <span>알림 센터</span>
@@ -745,6 +749,10 @@ table.data tr:hover td{background:var(--hover-bg,#fafbfc)}
       <button class="tab" data-tab="cost">
         <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
         비용 비교
+      </button>
+      <button class="tab" data-tab="parts">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>
+        부품 현황
       </button>
       <button class="tab" data-tab="alerts">
         <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
@@ -959,6 +967,50 @@ table.data tr:hover td{background:var(--hover-bg,#fafbfc)}
           💡 매달 절감액을 누적한 그래프입니다. <span style="color:#8b5cf6;font-weight:600;">논배터리 AS 절감</span>(vs 새제품)과 <span style="color:#10b981;font-weight:600;">업체별 수리비 절감</span>(vs 태클라스트)을 따로 표시합니다.
         </div>
         <div class="chart-wrap"><canvas id="chart-savings"></canvas></div>
+      </div>
+    </div>
+
+    <!-- ════════ Tab: Parts (부품 현황) ════════ -->
+    <div class="tab-pane" id="pane-parts" hidden>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">
+            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4"/><path d="M4 6v12c0 1.1.9 2 2 2h14v-4"/><path d="M18 12a2 2 0 0 0-2 2c0 1.1.9 2 2 2h4v-4h-4Z"/></svg>
+            재고 현황
+          </div>
+          <div style="padding:0 16px 4px;font-size:11.5px;color:var(--text-3);line-height:1.6;">
+            💡 현재 보유 중인 부품 재고입니다. 기종별로 묶어서 보여드려요.
+          </div>
+          <div id="parts-stock-list" style="padding:6px 16px 16px;"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">
+            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 16v-4M12 16V8M17 16v-7"/></svg>
+            부품 사용량 (누적)
+            <span class="right" id="parts-usage-total" style="font-weight:700;color:#3b82f6;">—</span>
+          </div>
+          <div style="padding:0 16px 4px;font-size:11.5px;color:var(--text-3);line-height:1.6;">
+            💡 수리에 실제 사용된 부품 개수(누적)입니다. 필름·스티커 등 소모성 부품은 집계에서 제외됩니다.
+          </div>
+          <div id="parts-usage-list" style="padding:6px 16px 16px;"></div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:16px;">
+        <div class="card-title">
+          <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/></svg>
+          건별 사용 부품
+          <span class="right" id="parts-entries-count" style="font-weight:700;">—</span>
+        </div>
+        <div style="padding:0 16px 4px;font-size:11.5px;color:var(--text-3);line-height:1.6;">
+          💡 각 수리건에 어떤 부품이 사용됐는지 보여드립니다. (수량은 표시하지 않습니다)
+        </div>
+        <div class="table-wrap">
+          <table class="data" id="parts-entries-table">
+            <thead><tr><th>시리얼</th><th>기종</th><th>날짜</th><th>수리 항목</th><th>사용 부품</th></tr></thead>
+            <tbody id="parts-entries-tbody"></tbody>
+          </table>
+        </div>
       </div>
     </div>
 
@@ -1931,6 +1983,79 @@ function goShippingPage(n) {
 /* ═══════════════════════════════════════════════════════════════
  *  RENDER: 비용 비교 탭
  * ═════════════════════════════════════════════════════════════ */
+function _escP(s) { return String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function renderParts() {
+  const stock = (state.raw && state.raw.stock) || [];
+  const stockLog = (state.raw && state.raw.stockLog) || [];
+  const entries = state.filtered || state.raw.entries || [];
+
+  // ── 1) 재고 현황 (전체, 소모성 포함, 기종별 그룹) ──
+  const stockListEl = document.getElementById('parts-stock-list');
+  if(stockListEl) {
+    if(!stock.length) {
+      stockListEl.innerHTML = `<div style="color:var(--text-3);font-size:13px;padding:12px 0;">재고 데이터가 없습니다.</div>`;
+    } else {
+      const groups = {};
+      stock.forEach(s => { const m = s.model || '공용'; (groups[m] = groups[m]||[]).push(s); });
+      const modelOrder = Object.keys(groups).sort((a,b) => a==='공용' ? -1 : b==='공용' ? 1 : a.localeCompare(b));
+      stockListEl.innerHTML = modelOrder.map(m => `
+        <div style="margin-bottom:10px;">
+          <div style="font-size:12px;font-weight:700;color:var(--text-2);margin-bottom:4px;">${_escP(m)}</div>
+          ${groups[m].map(s => {
+            const low = s.minQty && s.qty <= s.minQty;
+            return `<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 8px;border-radius:6px;${low?'background:rgba(239,68,68,.08);':''}font-size:12.5px;">
+              <span>${_escP(s.name)}</span>
+              <span style="font-weight:700;${low?'color:#ef4444;':'color:var(--text-1);'}">${fmt.num(s.qty)}개${low?' ⚠️':''}</span>
+            </div>`;
+          }).join('')}
+        </div>`).join('');
+    }
+  }
+
+  // ── 2) 부품 사용량 (누적, 소모성 제외 — consumable 플래그 대응 예정) ──
+  const usageListEl = document.getElementById('parts-usage-list');
+  const usageTotalEl = document.getElementById('parts-usage-total');
+  if(usageListEl) {
+    const stockByName = {};
+    stock.forEach(s => { stockByName[String(s.name).trim().toLowerCase()] = s; });
+    const usage = {};
+    stockLog.forEach(l => {
+      if(l.type !== 'out') return;
+      const s = stockByName[String(l.partName||'').trim().toLowerCase()];
+      if(s && s.consumable) return;   // ⭐ 소모성 부품 제외 (재고 등록 시 체크된 것)
+      const key = l.partName || '(이름없음)';
+      usage[key] = (usage[key]||0) + (Number(l.qty)||0);
+    });
+    const sorted = Object.entries(usage).sort((a,b) => b[1]-a[1]);
+    const total = sorted.reduce((s,[,v])=>s+v, 0);
+    if(usageTotalEl) usageTotalEl.textContent = total ? `${fmt.num(total)}개` : '—';
+    usageListEl.innerHTML = sorted.length ? sorted.map(([name, qty]) => `
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:5px 8px;font-size:12.5px;">
+        <span>${_escP(name)}</span>
+        <span style="font-weight:700;color:#3b82f6;">${fmt.num(qty)}개</span>
+      </div>`).join('') : `<div style="color:var(--text-3);font-size:13px;padding:12px 0;">집계할 사용 이력이 없습니다.</div>`;
+  }
+
+  // ── 3) 건별 사용 부품 (수량 미표기, 최신순 최대 200건) ──
+  const tbody = document.getElementById('parts-entries-tbody');
+  const countEl = document.getElementById('parts-entries-count');
+  if(tbody) {
+    const withParts = entries.filter(e => e.parts && typeof e.parts === 'object' && Object.keys(e.parts).length);
+    if(countEl) countEl.textContent = `${fmt.num(withParts.length)}건`;
+    const rows = withParts
+      .slice().sort((a,b) => new Date(b.date) - new Date(a.date))
+      .slice(0, 200);
+    tbody.innerHTML = rows.length ? rows.map(e => `
+      <tr>
+        <td style="font-family:monospace;">${_escP(e.serial||'-')}</td>
+        <td>${_escP(e.model||'-')}</td>
+        <td>${fmt.date(e.date)}</td>
+        <td>${(e.works||[]).map(w=>workName(w)).join(', ')}</td>
+        <td style="text-align:left;">${Object.keys(e.parts).map(n=>_escP(n)).join(', ')}</td>
+      </tr>`).join('') : `<tr><td colspan="5" style="text-align:center;color:var(--text-3);padding:20px;">부품 사용 내역이 없습니다.</td></tr>`;
+  }
+}
+
 function renderCost() {
   const data = state.filtered;
   const modelPartsAll = getNormalizedModelParts();
@@ -2287,6 +2412,7 @@ function activateTab(name) {
   // 탭별 lazy render (이미 렌더된 경우 다시 안 그림)
   if(name === 'shipping' && !state.charts._shipDone) { renderShipping(); state.charts._shipDone = true; }
   if(name === 'cost' && !state.charts.vendor) renderCost();
+  if(name === 'parts' && !state.charts._partsDone) { renderParts(); state.charts._partsDone = true; }
   if(name === 'analysis' && !state.charts.quarter) {
     renderQuarter(); renderWorktype(); renderHeatmap();
   }
