@@ -256,6 +256,8 @@ canvas,img{max-width:100%}
 .fb-search .ico{width:14px;height:14px;color:var(--text-3);flex-shrink:0;}
 .fb-search input{flex:1;border:0;outline:0;background:transparent;font-size:12.5px;color:var(--text);padding:8px 0;}
 .filter-bar.onerow .btn-search,.filter-bar.onerow .btn-reset{flex-shrink:0;min-height:36px;}
+.fb-actions{display:flex;gap:8px;flex-shrink:0;align-items:center;}
+.filter-bar.onerow .fb-search{flex-shrink:1;min-width:120px;}
 
 /* ⭐ 작은 칩 버튼 그룹 (분기/기종/수리유형) */
 .cgroup{display:inline-flex;gap:4px;flex-shrink:0;}
@@ -727,15 +729,17 @@ table.data tr:hover td{background:var(--hover-bg,#fafbfc)}
         <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
         <input type="text" id="f-serial" placeholder="시리얼 검색">
       </div>
-      <!-- 조회 / 초기화 -->
-      <button class="btn-search" id="btn-search">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-        조회
-      </button>
-      <button class="btn-reset" id="btn-reset">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9"/><polyline points="3 4 3 9 8 9"/></svg>
-        초기화
-      </button>
+      <!-- 조회 / 초기화 (한 묶음 — 줄바꿈 시에도 함께 이동) -->
+      <div class="fb-actions">
+        <button class="btn-search" id="btn-search">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+          조회
+        </button>
+        <button class="btn-reset" id="btn-reset">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9"/><polyline points="3 4 3 9 8 9"/></svg>
+          초기화
+        </button>
+      </div>
     </div>
 
     <!-- Tabs -->
@@ -1207,13 +1211,29 @@ async function loadData() {
   if(DEMO_MODE) {
     return generateDemoData();
   }
-  // Apps Script Web App: CORS/302 이슈로 fetch는 불안정.
-  // JSONP가 가장 안정적이라 이걸로 통일.
-  const resp = await loadJSONP();
+  // ⭐ 압축(fmt=2) fetch 우선 — 전송량 약 1/7 (600KB→88KB). 실패 시 JSONP(비압축) 폴백.
+  let resp = null;
+  if(typeof fetch === 'function' && typeof DecompressionStream === 'function') {
+    try { resp = await loadViaFetchZ(); } catch(e) { resp = null; }
+  }
+  if(!resp) resp = await loadJSONP();
   if(!resp || resp.ok !== true) {
     throw new Error(resp && resp.error ? resp.error : '서버 응답이 비정상입니다');
   }
   return resp.data;
+}
+
+async function loadViaFetchZ() {
+  const r = await fetch(APPS_SCRIPT_URL + '?action=load&client=1&fmt=2', { method:'GET', redirect:'follow' });
+  const txt = await r.text();
+  const obj = JSON.parse(txt);
+  if(obj && obj._z) {
+    const bytes = Uint8Array.from(atob(obj._z), c => c.charCodeAt(0));
+    const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
+    const jsonTxt = await new Response(stream).text();
+    return JSON.parse(jsonTxt);
+  }
+  return obj;
 }
 
 function loadJSONP() {
@@ -2421,10 +2441,15 @@ function generateAlerts() {
 
   // 사이드바/탭 뱃지 (긴급 + 경고만 카운트)
   const urgentCount = alerts.filter(a => a.kind === 'urgent' || a.kind === 'warn').length;
-  document.getElementById('sb-alert-badge').textContent = urgentCount;
-  document.getElementById('tab-alert-badge').textContent = urgentCount;
-  document.getElementById('sb-alert-badge').style.display = urgentCount ? 'flex':'none';
-  document.getElementById('tab-alert-badge').style.display = urgentCount ? 'flex':'none';
+  // ⭐ 읽음 처리: 알림 구성이 마지막으로 확인한 것과 같으면 뱃지 숨김
+  window._alertSig = alerts.map(a => a.title).join('|');
+  let _seen = '';
+  try { _seen = localStorage.getItem('va_alerts_seen') || ''; } catch(e) {}
+  const _badgeN = (_seen === window._alertSig) ? 0 : urgentCount;
+  document.getElementById('sb-alert-badge').textContent = _badgeN;
+  document.getElementById('tab-alert-badge').textContent = _badgeN;
+  document.getElementById('sb-alert-badge').style.display = _badgeN ? 'flex':'none';
+  document.getElementById('tab-alert-badge').style.display = _badgeN ? 'flex':'none';
 }
 
 function renderAlerts() {
@@ -2472,6 +2497,13 @@ function activateTab(name) {
   if(name === 'shipping' && !state.charts._shipDone) { renderShipping(); state.charts._shipDone = true; }
   if(name === 'cost' && !state.charts.vendor) renderCost();
   if(name === 'parts') renderParts();
+  if(name === 'alerts') {
+    // ⭐ 알림 확인 → 읽음 처리 (뱃지 제거)
+    try { localStorage.setItem('va_alerts_seen', window._alertSig || ''); } catch(e) {}
+    const sb = document.getElementById('sb-alert-badge'), tb = document.getElementById('tab-alert-badge');
+    if(sb) sb.style.display = 'none';
+    if(tb) tb.style.display = 'none';
+  }
   if(name === 'analysis' && !state.charts.quarter) {
     renderQuarter(); renderWorktype(); renderHeatmap();
   }
