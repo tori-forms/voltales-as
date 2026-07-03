@@ -80,6 +80,7 @@
 
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%}
+body{zoom:0.9;}  /* ⭐ 100% 배율을 90% 스케일로 싱크 — 한 화면에 더 담김 (Firefox는 무시=기존 크기) */
 body{
   font-family:'Pretendard Variable','Pretendard',-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo','Noto Sans KR',sans-serif;
   font-feature-settings:'tnum';
@@ -1027,7 +1028,7 @@ table.data tr:hover td{background:var(--hover-bg,#fafbfc)}
           <select id="pe-part" onchange="renderPartsEntries()" style="height:32px;padding:0 10px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text);font-size:12.5px;max-width:260px;">
             <option value="">부품 전체</option>
           </select>
-          <button onclick="exportPartsEntriesCSV()" style="height:32px;padding:0 14px;border:none;border-radius:8px;background:#10b981;color:#fff;font-size:12.5px;font-weight:600;cursor:pointer;">⬇ 엑셀(CSV) 내보내기</button>
+          <button onclick="exportPartsEntriesCSV()" style="height:32px;padding:0 14px;border:none;border-radius:8px;background:#10b981;color:#fff;font-size:12.5px;font-weight:600;cursor:pointer;">⬇ 엑셀 내보내기</button>
         </div>
         <div class="table-wrap">
           <table class="data" id="parts-entries-table">
@@ -2161,13 +2162,26 @@ function renderPartsEntries() {
 function exportPartsEntriesCSV() {
   const rows = _peRows();
   if(!rows.length) { alert('내보낼 내역이 없습니다.'); return; }
-  const head = '시리얼,기종,출고일,수리 항목,사용 부품';
-  const body = rows.map(r => [r.serial, r.model, fmt.date(r.shipDate), `"${r.works}"`, `"${r.parts.join(', ')}"`].join(','));
-  const csv = '\uFEFF' + [head, ...body].join('\n');
+  const today = new Date().toISOString().slice(0,10);
+  const aoa = [
+    ['시리얼','기종','출고일','수리 항목','사용 부품'],
+    ...rows.map(r => [r.serial, r.model, fmt.date(r.shipDate), r.works, r.parts.join(', ')])
+  ];
+  // ⭐ 진짜 엑셀(.xlsx)로 내보내기 — 한글 깨짐·연결 프로그램 문제 없음
+  if(typeof XLSX !== 'undefined') {
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    ws['!cols'] = [{wch:18},{wch:10},{wch:12},{wch:24},{wch:90}];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, '건별 사용 부품');
+    XLSX.writeFile(wb, `출고건별_사용부품_${today}.xlsx`);
+    return;
+  }
+  // 폴백: CSV(BOM)
+  const csv = '\uFEFF' + aoa.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = `출고건별_사용부품_${new Date().toISOString().slice(0,10)}.csv`;
+  a.download = `출고건별_사용부품_${today}.csv`;
   a.click();
   URL.revokeObjectURL(a.href);
 }
