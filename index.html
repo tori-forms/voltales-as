@@ -2471,7 +2471,7 @@ function activateTab(name) {
   // 탭별 lazy render (이미 렌더된 경우 다시 안 그림)
   if(name === 'shipping' && !state.charts._shipDone) { renderShipping(); state.charts._shipDone = true; }
   if(name === 'cost' && !state.charts.vendor) renderCost();
-  if(name === 'parts' && !state.charts._partsDone) { renderParts(); state.charts._partsDone = true; }
+  if(name === 'parts') renderParts();
   if(name === 'analysis' && !state.charts.quarter) {
     renderQuarter(); renderWorktype(); renderHeatmap();
   }
@@ -2714,6 +2714,7 @@ function refresh() {
   if(activeTab === 'analysis') { renderQuarter(); renderWorktype(); renderHeatmap(); }
   if(activeTab === 'shipping') renderShipping();
   if(activeTab === 'cost') renderCost();
+  if(activeTab === 'parts') renderParts();
   if(activeTab === 'alerts') renderAlerts();
 }
 
