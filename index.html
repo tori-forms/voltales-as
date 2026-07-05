@@ -80,6 +80,7 @@
 
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%}
+html{background:var(--bg);}
 body{zoom:0.9;}  /* ⭐ 100% 배율을 90% 스케일로 싱크 — 한 화면에 더 담김 (Firefox는 무시=기존 크기) */
 body{
   font-family:'Pretendard Variable','Pretendard',-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo','Noto Sans KR',sans-serif;
@@ -95,7 +96,7 @@ input,select{font-family:inherit;font-size:inherit;color:inherit}
 a{color:inherit;text-decoration:none}
 
 /* ─────────────── Layout ─────────────── */
-.layout{display:grid;grid-template-columns:220px minmax(0,1fr);min-height:100vh}
+.layout{display:grid;grid-template-columns:220px minmax(0,1fr);min-height:calc(100vh / 0.9)}  /* ⭐ zoom 0.9 보정 */
 body{overflow-x:hidden}
 canvas,img{max-width:100%}
 .chart-wrap{max-width:100%;overflow:hidden}
@@ -105,7 +106,7 @@ canvas,img{max-width:100%}
   background:var(--sidebar-bg);
   color:var(--sidebar-text);
   display:flex;flex-direction:column;
-  position:sticky;top:0;height:100vh;
+  position:sticky;top:0;height:calc(100vh / 0.9);  /* ⭐ zoom 0.9 보정 */
   padding:0;
   border-right:1px solid var(--sidebar-border);
 }
