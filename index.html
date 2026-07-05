@@ -936,7 +936,7 @@ table.data tr:hover td{background:var(--hover-bg,#fafbfc)}
         </div>
         <div class="table-wrap">
           <table class="data" id="exchange-table">
-            <thead><tr><th style="width:40px">No</th><th>시리얼번호</th><th>기종</th><th>사유</th><th>처리일</th><th>상태</th></tr></thead>
+            <thead><tr><th style="width:40px">No</th><th>시리얼번호</th><th>기종</th><th>사유</th><th>점검일</th></tr></thead>
             <tbody id="exchange-tbody"></tbody>
           </table>
         </div>
@@ -2059,7 +2059,7 @@ function renderExchange() {
   if(!tbody) return;
   if(cnt) cnt.textContent = ex.length ? `${fmt.num(ex.length)}건` : '0건';
   if(!ex.length) {
-    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--text-3);padding:20px;">수리 불가(교환) 처리 내역이 없습니다.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--text-3);padding:20px;">수리 불가 처리 내역이 없습니다.</td></tr>`;
     return;
   }
   const rows = ex.slice().sort((a,b) => new Date(b.date||0) - new Date(a.date||0));
@@ -2069,9 +2069,8 @@ function renderExchange() {
       <td>${i+1}</td>
       <td style="font-family:monospace;">${_escP(x.serial||'-')}</td>
       <td>${_escP(String(x.model||'-').replace(/_N$/i,''))}</td>  <!-- 교품은 재작업 전 기기 — _N 미표기 -->
-      <td style="text-align:left;">${_escP(x.reason||'-')}</td>
+      <td style="text-align:left;">비용 초과${Number(x.estimatedCost) > 0 ? ` <span style="color:var(--text-3);">(예상 수리비 ${fmt.won(Number(x.estimatedCost))})</span>` : ''}</td>
       <td>${fmt.date(x.date)}</td>
-      <td><span class="badge-done" style="background:rgba(139,92,246,.12);color:#8b5cf6;padding:3px 10px;border-radius:99px;font-size:12px;font-weight:700;">교환 완료</span></td>
     </tr>`).join('');
 }
 
