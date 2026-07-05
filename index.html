@@ -643,6 +643,10 @@ table.data tr:hover td{background:var(--hover-bg,#fafbfc)}
         <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"/><path d="M15 18H9"/><path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.624l-3.48-4.35A1 1 0 0 0 17.52 8H14"/><circle cx="17" cy="18" r="2"/><circle cx="7" cy="18" r="2"/></svg>
         <span>출고 목록</span>
       </button>
+      <button class="sb-item" data-tab="unrepair">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 3h5v5"/><path d="M8 21H3v-5"/><path d="M21 3 3 21"/><path d="M21 16v5h-5"/><path d="M3 8V3h5"/></svg>
+        <span>수리 불가</span>
+      </button>
       <button class="sb-item" data-tab="cost">
         <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
         <span>비용 비교</span>
@@ -757,6 +761,10 @@ table.data tr:hover td{background:var(--hover-bg,#fafbfc)}
       <button class="tab" data-tab="shipping">
         <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"/><path d="M15 18H9"/><path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.624l-3.48-4.35A1 1 0 0 0 17.52 8H14"/><circle cx="17" cy="18" r="2"/><circle cx="7" cy="18" r="2"/></svg>
         출고 목록
+      </button>
+      <button class="tab" data-tab="unrepair">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 3h5v5"/><path d="M8 21H3v-5"/><path d="M21 3 3 21"/><path d="M21 16v5h-5"/><path d="M3 8V3h5"/></svg>
+        수리 불가
       </button>
       <button class="tab" data-tab="cost">
         <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
@@ -913,19 +921,22 @@ table.data tr:hover td{background:var(--hover-bg,#fafbfc)}
         <div id="ship-pagination" class="pagination"></div>
       </div>
 
-      <!-- ⭐ 교품 처리 현황 (엔지니어명 미노출) -->
-      <div class="card" style="margin-top:16px;">
+    </div>
+
+    <!-- ════════ Tab: 수리 불가 (교품 처리) ════════ -->
+    <div class="tab-pane" id="pane-unrepair" hidden>
+      <div class="card">
         <div class="card-title">
           <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 3h5v5"/><path d="M8 21H3v-5"/><path d="M21 3 3 21"/><path d="M21 16v5h-5"/><path d="M3 8V3h5"/></svg>
-          교품 처리
+          수리 불가 처리
           <span class="right" id="exchange-count" style="font-weight:700;">—</span>
         </div>
         <div style="padding:0 16px 4px;font-size:11.5px;color:var(--text-3);line-height:1.6;">
-          💡 수리 대신 <b>교품(제품 교환)으로 처리된</b> 기기입니다. 아래 기기들은 수리 대기가 아니라 이미 교품 완료된 건입니다.
+          💡 점검 결과 <b>수리가 불가하여 제품 교환(교품)으로 처리된</b> 기기 목록입니다. 아래 기기들은 수리 대기 중이 아니며, 이미 교환 처리 완료된 건입니다.
         </div>
         <div class="table-wrap">
           <table class="data" id="exchange-table">
-            <thead><tr><th style="width:40px">No</th><th>시리얼번호</th><th>기종</th><th>교품 사유</th><th>처리일</th><th>상태</th></tr></thead>
+            <thead><tr><th style="width:40px">No</th><th>시리얼번호</th><th>기종</th><th>사유</th><th>처리일</th><th>상태</th></tr></thead>
             <tbody id="exchange-tbody"></tbody>
           </table>
         </div>
@@ -1897,7 +1908,6 @@ function renderHeatmap() {
  *  RENDER: 출고 목록 탭
  * ═════════════════════════════════════════════════════════════ */
 function renderShipping() {
-  try { renderExchange(); } catch(e) { console.warn('교품 렌더 실패', e); }
   const ship = state.filteredShip;
   const entries = state.filtered;
   // 처리일(등록일~출고일) 매칭용은 전체 entries 기준
@@ -2049,7 +2059,7 @@ function renderExchange() {
   if(!tbody) return;
   if(cnt) cnt.textContent = ex.length ? `${fmt.num(ex.length)}건` : '0건';
   if(!ex.length) {
-    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--text-3);padding:20px;">교품 처리 내역이 없습니다.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--text-3);padding:20px;">수리 불가(교환) 처리 내역이 없습니다.</td></tr>`;
     return;
   }
   const rows = ex.slice().sort((a,b) => new Date(b.date||0) - new Date(a.date||0));
@@ -2058,10 +2068,10 @@ function renderExchange() {
     <tr>
       <td>${i+1}</td>
       <td style="font-family:monospace;">${_escP(x.serial||'-')}</td>
-      <td>${_escP(x.model||'-')}</td>
+      <td>${_escP(String(x.model||'-').replace(/_N$/i,''))}</td>  <!-- 교품은 재작업 전 기기 — _N 미표기 -->
       <td style="text-align:left;">${_escP(x.reason||'-')}</td>
       <td>${fmt.date(x.date)}</td>
-      <td><span class="badge-done" style="background:rgba(139,92,246,.12);color:#8b5cf6;padding:3px 10px;border-radius:99px;font-size:12px;font-weight:700;">교품 완료</span></td>
+      <td><span class="badge-done" style="background:rgba(139,92,246,.12);color:#8b5cf6;padding:3px 10px;border-radius:99px;font-size:12px;font-weight:700;">교환 완료</span></td>
     </tr>`).join('');
 }
 
@@ -2512,6 +2522,7 @@ function activateTab(name) {
   if(name === 'shipping' && !state.charts._shipDone) { renderShipping(); state.charts._shipDone = true; }
   if(name === 'cost' && !state.charts.vendor) renderCost();
   if(name === 'parts') renderParts();
+  if(name === 'unrepair') { try { renderExchange(); } catch(e) {} }
   if(name === 'alerts') {
     // ⭐ 알림 확인 → 읽음 처리 (뱃지 제거)
     try { localStorage.setItem('va_alerts_seen', window._alertSig || ''); } catch(e) {}
@@ -2771,6 +2782,7 @@ function refresh() {
   if(activeTab === 'shipping') renderShipping();
   if(activeTab === 'cost') renderCost();
   if(activeTab === 'parts') renderParts();
+  if(activeTab === 'unrepair') { try { renderExchange(); } catch(e) {} }
   if(activeTab === 'alerts') renderAlerts();
 }
 
