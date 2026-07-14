@@ -647,6 +647,10 @@ table.data tr:hover td{background:var(--hover-bg,#fafbfc)}
         <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 3h5v5"/><path d="M8 21H3v-5"/><path d="M21 3 3 21"/><path d="M21 16v5h-5"/><path d="M3 8V3h5"/></svg>
         <span>수리 불가</span>
       </button>
+      <button class="sb-item" data-tab="reentry">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+        <span>재인입 추적</span>
+      </button>
       <button class="sb-item" data-tab="cost">
         <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
         <span>비용 비교</span>
@@ -766,6 +770,7 @@ table.data tr:hover td{background:var(--hover-bg,#fafbfc)}
         <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 3h5v5"/><path d="M8 21H3v-5"/><path d="M21 3 3 21"/><path d="M21 16v5h-5"/><path d="M3 8V3h5"/></svg>
         수리 불가
       </button>
+      <button class="tab" data-tab="reentry">🔁 재인입 추적</button>
       <button class="tab" data-tab="cost">
         <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
         비용 비교
@@ -924,6 +929,22 @@ table.data tr:hover td{background:var(--hover-bg,#fafbfc)}
     </div>
 
     <!-- ════════ Tab: 수리 불가 (교품 처리) ════════ -->
+    <div class="tab-pane" id="pane-reentry" hidden>
+      <div class="kpi-grid" id="reentry-kpis" style="margin-bottom:16px;"></div>
+      <div class="card">
+        <div class="card-title">
+          <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+          재인입(재전달) 기기 추적
+          <span class="right" id="reentry-count" style="font-weight:700;">—</span>
+        </div>
+        <div style="padding:0 16px 4px;font-size:11.5px;color:var(--text-3);line-height:1.6;">
+          💡 출고 후 다시 전달된 기기를 <b>시리얼별로 묶어</b> 회차·사유와 함께 추적합니다 —
+          <b style="color:#ef4444;">증상 재발</b>(볼타레스 수리 이슈) · <b style="color:#d97706;">매장/고객 과실</b>(파손 등) · <b style="color:#2563eb;">단순 작업 요청</b>(펌웨어/점검 등)
+        </div>
+        <div id="reentry-body" style="padding:8px 16px 16px;"></div>
+      </div>
+    </div>
+
     <div class="tab-pane" id="pane-unrepair" hidden>
       <div class="card">
         <div class="card-title">
@@ -1517,11 +1538,16 @@ function renderKPI() {
     .filter(x => x !== null);
   const avgLead = leadTimes.length ? leadTimes.reduce((a,b)=>a+b,0)/leadTimes.length : 0;
 
-  // 재발 수리율: 같은 시리얼 2번 이상
-  const serialCount = {};
-  data.forEach(e => serialCount[e.serial] = (serialCount[e.serial]||0) + 1);
-  const repeats = Object.values(serialCount).filter(c => c >= 2).length;
-  const repeatPct = total ? (repeats/total*100) : 0;
+  // ⭐ 재발 수리율 개편 — 재인입(재전달) 정식 데이터 기반:
+  //   분자 = 재인입 건 중 '볼타레스 수리 이슈(재발, rs=defect)'만  ·  분모 = 출고 완료 건수
+  //   매장 과실(store)·단순 작업(task)은 재발률에서 제외하고 별도 집계 (foot에 표기)
+  const _parseRe = (e) => { try { const r = JSON.parse(e.reentry || ''); return (r && r.v >= 2) ? r : null; } catch(_) { return null; } };
+  const reentries = data.map(_parseRe).filter(Boolean);
+  const _reCnt = { defect:0, store:0, task:0, etc:0 };
+  reentries.forEach(r => { _reCnt[r.rs] = (_reCnt[r.rs] || 0) + 1; });
+  const shippedCnt = data.filter(e => String(e.status) === 'shipped').length;
+  const repeats = reentries.length;   // 재입고(재인입) 총 건수
+  const repeatPct = shippedCnt ? (_reCnt.defect / shippedCnt * 100) : 0;
 
   const kpis = [
     {label:'총 작업 수량', val:fmt.num(total), unit:'건', color:'slate', icon:'wrench', foot:'필터 적용 기준'},
@@ -1529,7 +1555,7 @@ function renderKPI() {
     {label:'건당 평균 청구액', val:fmt.num(Math.round(avgBilled)), unit:'원', color:'amber', icon:'calc', foot:'건당 공임'},
     {label:'복합수리 비율', val:multiPct.toFixed(0), unit:'%', color:'purple', icon:'layers', foot:`${multi}건 / ${total}건`},
     {label:'평균 처리 리드타임', val:avgLead.toFixed(1), unit:'일', color:'cyan', icon:'clock', foot:'수리등록 ~ 출고 소요일'},
-    {label:'재발 수리율', val:repeatPct.toFixed(1), unit:'%', color:'rose', icon:'refresh', foot:`${repeats}건 재입고`},
+    {label:'재발 수리율', val:repeatPct.toFixed(1), unit:'%', color:'rose', icon:'refresh', foot:`증상재발 ${_reCnt.defect} · 과실 ${_reCnt.store} · 단순작업 ${_reCnt.task}${_reCnt.etc ? ` · 기타 ${_reCnt.etc}` : ''} (재입고 ${repeats}건)`},
   ];
 
   const ICONS = {
@@ -2509,6 +2535,87 @@ function renderAlerts() {
 /* ═══════════════════════════════════════════════════════════════
  *  TAB SWITCH
  * ═════════════════════════════════════════════════════════════ */
+const RE_REASONS = {
+  defect: { label: '증상 재발',      color: '#ef4444', bg: '#fef2f2' },
+  store:  { label: '매장/고객 과실', color: '#d97706', bg: '#fffbeb' },
+  task:   { label: '단순 작업 요청', color: '#2563eb', bg: '#eff6ff' },
+  etc:    { label: '기타',           color: '#64748b', bg: '#f8fafc' }
+};
+function _reParse(e) {
+  try { const r = JSON.parse(e.reentry || ''); return (r && r.v >= 2) ? r : null; } catch(_) { return null; }
+}
+function _reTag(rs, small) {
+  const c = RE_REASONS[rs] || RE_REASONS.etc;
+  return `<span style="display:inline-block;font-size:${small?'10.5':'11'}px;font-weight:700;padding:1px 8px;border-radius:99px;background:${c.bg};color:${c.color};border:1px solid ${c.color}44;white-space:nowrap;">${c.label}</span>`;
+}
+function renderReentry() {
+  const data = state.filtered || [];
+  const kpiEl = document.getElementById('reentry-kpis');
+  const bodyEl = document.getElementById('reentry-body');
+  const cntEl = document.getElementById('reentry-count');
+  if(!kpiEl || !bodyEl) return;
+
+  const reEntries = data.filter(e => _reParse(e));
+  const bySerial = {};
+  data.forEach(e => { (bySerial[e.serial] = bySerial[e.serial] || []).push(e); });
+  const groups = Object.entries(bySerial)
+    .filter(([, arr]) => arr.some(e => _reParse(e)))
+    .map(([serial, arr]) => {
+      const sorted = arr.slice().sort((a, b) => new Date(a.date) - new Date(b.date));
+      const timeline = sorted.map(e => ({ e, r: _reParse(e) }));
+      const lastRe = timeline.filter(x => x.r).pop();
+      return { serial, visits: sorted.length, timeline,
+               lastReDate: lastRe ? lastRe.e.date : sorted[sorted.length-1].date,
+               cur: sorted[sorted.length-1] };
+    })
+    .sort((a, b) => new Date(b.lastReDate) - new Date(a.lastReDate));
+
+  const cnt = { defect: 0, store: 0, task: 0, etc: 0 };
+  reEntries.forEach(e => { const r = _reParse(e); cnt[r.rs] = (cnt[r.rs] || 0) + 1; });
+  const tot = reEntries.length;
+  const kpiCard = (k) => {
+    const c = RE_REASONS[k];
+    const pct = tot ? (cnt[k] / tot * 100).toFixed(0) : 0;
+    return `<div class="kpi" style="border-left:3px solid ${c.color};">
+      <div class="kpi-label">${c.label}</div>
+      <div class="kpi-val" style="color:${c.color};">${cnt[k]}<span class="kpi-unit">건</span></div>
+      <div class="kpi-foot">재인입의 ${pct}%</div>
+    </div>`;
+  };
+  kpiEl.innerHTML = ['defect', 'store', 'task'].map(kpiCard).join('') + `
+    <div class="kpi"><div class="kpi-label">재인입 총계</div>
+      <div class="kpi-val">${tot}<span class="kpi-unit">건</span></div>
+      <div class="kpi-foot">기기 ${groups.length}대${cnt.etc ? ` · 기타 ${cnt.etc}건 포함` : ''} · 필터 적용 기준</div></div>`;
+  if(cntEl) cntEl.textContent = `${groups.length}대 · ${tot}건`;
+
+  if(!groups.length) {
+    bodyEl.innerHTML = `<div style="padding:32px;text-align:center;color:var(--text-3);font-size:13px;">재인입(재전달) 기록이 없습니다.</div>`;
+    return;
+  }
+
+  bodyEl.innerHTML = groups.map(g => {
+    const shipped = String(g.cur.status) === 'shipped';
+    const steps = g.timeline.map((x, i) => {
+      const d = String(x.e.date).slice(0, 10);
+      return `<div style="display:flex;align-items:center;gap:8px;padding:4px 0;flex-wrap:wrap;">
+        <span style="font-size:11px;font-weight:800;color:var(--text-3);min-width:34px;">${i + 1}차</span>
+        <span style="font-size:11.5px;font-family:monospace;color:var(--text-2);min-width:82px;">${d}</span>
+        ${x.r ? _reTag(x.r.rs, true) : '<span style="font-size:10.5px;color:var(--text-3);">최초 수리</span>'}
+        ${x.r && x.r.memo ? `<span style="font-size:11px;color:var(--text-3);">— ${x.r.memo}</span>` : ''}
+      </div>`;
+    }).join('');
+    return `<div style="border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:10px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:6px;">
+        <div style="font-weight:800;font-family:monospace;font-size:13.5px;">${g.serial}
+          <span style="font-size:11px;font-weight:700;color:#be123c;background:#fff1f2;border:1px solid #fda4af;padding:1px 8px;border-radius:99px;margin-left:8px;">총 ${g.visits}회 수리</span>
+        </div>
+        <span style="font-size:11px;font-weight:700;padding:2px 10px;border-radius:99px;${shipped ? 'background:#f0fdf4;color:#15803d;border:1px solid #86efac;' : 'background:#fefce8;color:#a16207;border:1px solid #fde047;'}">${shipped ? '출고 완료' : '수리 진행 중'}</span>
+      </div>
+      ${steps}
+    </div>`;
+  }).join('');
+}
+
 function activateTab(name) {
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
   document.querySelectorAll('.sb-item[data-tab]').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
@@ -2522,6 +2629,7 @@ function activateTab(name) {
   if(name === 'cost' && !state.charts.vendor) renderCost();
   if(name === 'parts') renderParts();
   if(name === 'unrepair') { try { renderExchange(); } catch(e) {} }
+  if(name === 'reentry') { try { renderReentry(); } catch(e) {} }
   if(name === 'alerts') {
     // ⭐ 알림 확인 → 읽음 처리 (뱃지 제거)
     try { localStorage.setItem('va_alerts_seen', window._alertSig || ''); } catch(e) {}
