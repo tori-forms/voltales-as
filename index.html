@@ -955,6 +955,7 @@ table.data tr:hover td{background:var(--hover-bg,#fafbfc)}
         <div style="padding:0 16px 4px;font-size:11.5px;color:var(--text-3);line-height:1.6;">
           💡 AS 비용이 <b>새 제품 구매가를 초과</b>하는 것으로 판정되는 경우 <b>수리 불가</b>로 처리됩니다. 아래는 수리 불가 처리된 기기 목록입니다.
         </div>
+        <div id="exchange-model-filter" style="padding:8px 16px 0;display:flex;gap:6px;flex-wrap:wrap;"></div>
         <div class="table-wrap">
           <table class="data" id="exchange-table">
             <thead><tr><th style="width:40px">No</th><th>시리얼번호</th><th>기종</th><th>사유</th><th>점검일</th></tr></thead>
@@ -2083,12 +2084,28 @@ function renderExchange() {
   const tbody = document.getElementById('exchange-tbody');
   const cnt = document.getElementById('exchange-count');
   if(!tbody) return;
-  if(cnt) cnt.textContent = ex.length ? `${fmt.num(ex.length)}건` : '0건';
-  if(!ex.length) {
+  // ⭐ v2.70k: 기종 필터 — 칩 클릭으로 기종별 보기 (표기는 _N 제거된 고객 노출용)
+  const _mKey = (m) => String(m||'').replace(/_N$/i,'').toUpperCase() || '-';
+  window._excModelF = window._excModelF || 'all';
+  const models = [...new Set(ex.map(x => _mKey(x.model)))].sort();
+  if(window._excModelF !== 'all' && !models.includes(window._excModelF)) window._excModelF = 'all';
+  const filterEl = document.getElementById('exchange-model-filter');
+  if(filterEl) {
+    const chip = (val, label, count) => {
+      const on = window._excModelF === val;
+      return `<button onclick="window._excModelF='${val}';renderExchange()" style="cursor:pointer;font-size:12px;font-weight:700;padding:5px 12px;border-radius:99px;border:1px solid ${on?'var(--accent,#2563eb)':'var(--line,#e5e7eb)'};background:${on?'var(--accent,#2563eb)':'transparent'};color:${on?'#fff':'var(--text-2,#555)'};">${label} ${count}</button>`;
+    };
+    filterEl.innerHTML = models.length > 1
+      ? chip('all', '전체', ex.length) + models.map(m => chip(m, m, ex.filter(x => _mKey(x.model) === m).length)).join('')
+      : '';
+  }
+  const fex = window._excModelF === 'all' ? ex : ex.filter(x => _mKey(x.model) === window._excModelF);
+  if(cnt) cnt.textContent = ex.length ? `${fmt.num(fex.length)}건${window._excModelF!=='all' ? ` / 전체 ${fmt.num(ex.length)}건` : ''}` : '0건';
+  if(!fex.length) {
     tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--text-3);padding:20px;">수리 불가 처리 내역이 없습니다.</td></tr>`;
     return;
   }
-  const rows = ex.slice().sort((a,b) => new Date(b.date||0) - new Date(a.date||0));
+  const rows = fex.slice().sort((a,b) => new Date(b.date||0) - new Date(a.date||0));
   // ⚠️ 엔지니어명(worker)은 고객 노출 금지 — 절대 렌더하지 않음
   tbody.innerHTML = rows.map((x,i) => `
     <tr>
