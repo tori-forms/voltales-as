@@ -2612,12 +2612,12 @@ function renderReentry() {
       <div class="kpi-foot">재인입의 ${pct}%</div>
     </div>`;
   };
-  kpiEl.style.gridTemplateColumns = 'repeat(5, 1fr)';   // ⭐ v2.70v: 타 불량 발생 카드 포함 5장
-  kpiEl.innerHTML = ['defect', 'newdefect', 'store', 'task'].map(kpiCard).join('') + `
+  kpiEl.style.gridTemplateColumns = 'repeat(6, 1fr)';   // ⭐ v2.70y: 기타 카드 포함 6장 — 어느 분류도 숨지 않게
+  kpiEl.innerHTML = ['defect', 'newdefect', 'store', 'task', 'etc'].map(kpiCard).join('') + `
     <div class="kpi" style="${_center}">
       <div class="kpi-label">재인입 총계</div>
       <div class="kpi-value">${tot}<span class="unit">건</span></div>
-      <div class="kpi-foot">기기 ${groups.length}대${cnt.etc ? ` · 기타 ${cnt.etc}건 포함` : ''}</div></div>`;
+      <div class="kpi-foot">기기 ${groups.length}대</div></div>`;
   if(cntEl) cntEl.textContent = `${groups.length}대 · ${tot}건`;
 
   if(!groups.length) {
