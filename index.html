@@ -939,7 +939,7 @@ table.data tr:hover td{background:var(--hover-bg,#fafbfc)}
         </div>
         <div style="padding:0 16px 4px;font-size:11.5px;color:var(--text-3);line-height:1.6;">
           💡 출고 후 다시 전달된 기기를 <b>시리얼별로 묶어</b> 회차·사유와 함께 추적합니다 —
-          <b style="color:#ef4444;">증상 재발</b>(볼타레스 수리 이슈) · <b style="color:#d97706;">매장/고객 과실</b>(파손 등) · <b style="color:#2563eb;">단순 작업 요청</b>(펌웨어/점검 등)
+          <b style="color:#ef4444;">증상 재발</b>(볼타레스 수리 이슈) · <b style="color:#8b5cf6;">타 불량 발생</b>(기존 수리와 다른 새 증상) · <b style="color:#d97706;">매장/고객 과실</b>(파손 등) · <b style="color:#2563eb;">단순 작업 요청</b>(펌웨어/점검 등)
         </div>
         <div id="reentry-body" style="padding:8px 16px 16px;"></div>
       </div>
@@ -2559,10 +2559,17 @@ function renderAlerts() {
  * ═════════════════════════════════════════════════════════════ */
 const RE_REASONS = {
   defect: { label: '증상 재발',      color: '#ef4444', bg: '#fef2f2' },
+  newdefect: { label: '타 불량 발생', color: '#8b5cf6', bg: '#f5f3ff' },   // ⭐ v2.70v: 기존 수리와 다른 새 증상 — 재발 아님
   store:  { label: '매장/고객 과실', color: '#d97706', bg: '#fffbeb' },
   task:   { label: '단순 작업 요청', color: '#2563eb', bg: '#eff6ff' },
   etc:    { label: '기타',           color: '#64748b', bg: '#f8fafc' }
 };
+// ⭐ v2.70v: 구형 '기타' 기록 중 메모가 '추가 발견/타 불량' 계열이면 표시상 타 불량 발생으로 재분류
+function _reClassRs(r) {
+  if(!r) return 'etc';
+  if(r.rs === 'etc' && /추가 발견|추가 발생|다른 불량|타 불량|새 증상|새로운 불량|추가로 발견/.test(String(r.memo || ''))) return 'newdefect';
+  return r.rs;
+}
 function _reParse(e) {
   try { const r = JSON.parse(e.reentry || ''); return (r && r.v >= 2) ? r : null; } catch(_) { return null; }
 }
@@ -2592,8 +2599,8 @@ function renderReentry() {
     })
     .sort((a, b) => new Date(b.lastReDate) - new Date(a.lastReDate));
 
-  const cnt = { defect: 0, store: 0, task: 0, etc: 0 };
-  reEntries.forEach(e => { const r = _reParse(e); cnt[r.rs] = (cnt[r.rs] || 0) + 1; });
+  const cnt = { defect: 0, newdefect: 0, store: 0, task: 0, etc: 0 };
+  reEntries.forEach(e => { const r = _reParse(e); const k = _reClassRs(r); cnt[k] = (cnt[k] || 0) + 1; });
   const tot = reEntries.length;
   const _center = 'display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;';
   const kpiCard = (k) => {
@@ -2605,8 +2612,8 @@ function renderReentry() {
       <div class="kpi-foot">재인입의 ${pct}%</div>
     </div>`;
   };
-  kpiEl.style.gridTemplateColumns = 'repeat(4, 1fr)';   // 4장 균등 배치 (기본 6열 그리드 대체)
-  kpiEl.innerHTML = ['defect', 'store', 'task'].map(kpiCard).join('') + `
+  kpiEl.style.gridTemplateColumns = 'repeat(5, 1fr)';   // ⭐ v2.70v: 타 불량 발생 카드 포함 5장
+  kpiEl.innerHTML = ['defect', 'newdefect', 'store', 'task'].map(kpiCard).join('') + `
     <div class="kpi" style="${_center}">
       <div class="kpi-label">재인입 총계</div>
       <div class="kpi-value">${tot}<span class="unit">건</span></div>
@@ -2625,7 +2632,7 @@ function renderReentry() {
       return `<div style="display:flex;align-items:center;gap:8px;padding:4px 0;flex-wrap:wrap;">
         <span style="font-size:11px;font-weight:800;color:var(--text-3);min-width:34px;">${i + 1}차</span>
         <span style="font-size:11.5px;font-family:monospace;color:var(--text-2);min-width:82px;">${d}</span>
-        ${x.r ? _reTag(x.r.rs, true) : '<span style="font-size:10.5px;color:var(--text-3);">최초 수리</span>'}
+        ${x.r ? _reTag(_reClassRs(x.r), true) : '<span style="font-size:10.5px;color:var(--text-3);">최초 수리</span>'}
         ${x.r && x.r.memo ? `<span style="font-size:11px;color:var(--text-3);">— ${x.r.memo}</span>` : ''}
       </div>`;
     }).join('');
