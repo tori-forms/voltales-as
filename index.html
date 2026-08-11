@@ -1966,6 +1966,7 @@ function renderShipping() {
       processDays,
       billed,
       status: '출고완료',
+      bgrade: !!(e && String(e.note || '').includes('[B급]')),   // ⭐ v2.71: B급 제품 표기
     });
   });
   pending.forEach((e) => {
@@ -1978,6 +1979,7 @@ function renderShipping() {
       processDays: null,
       billed: 0, // 미출고는 미청구
       status: '출고대기',
+      bgrade: String(e.note || '').includes('[B급]'),   // ⭐ v2.71: B급 제품 표기
     });
   });
 
@@ -2030,7 +2032,7 @@ function renderShipping() {
         <td>${r.shipDate}</td>
         <td>${r.processDays !== null ? r.processDays.toFixed(1)+'일' : '-'}</td>
         <td style="text-align:right;font-variant-numeric:tabular-nums">${r.billed ? fmt.num(r.billed)+'원' : '-'}</td>
-        <td><span class="tag ${tagClass}">${r.status}</span></td>
+        <td><span class="tag ${tagClass}">${r.status}</span>${r.bgrade ? ' <span class="tag" style="background:rgba(245,158,11,.14);color:#f59e0b;border:1px solid rgba(245,158,11,.45);font-weight:700;">B급</span>' : ''}</td>
       </tr>`;
   }).join('') || '<tr><td colspan="8"><div class="empty">데이터가 없습니다</div></td></tr>';
 
