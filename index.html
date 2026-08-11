@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=1280">
-<title>볼타레스 AS — AS 현황 대시보드</title>
+<title>폼즈 AS — AS 현황 대시보드</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%E2%9A%A1%3C/text%3E%3C/svg%3E" type="image/svg+xml">
 
 <!-- Pretendard 폰트 -->
@@ -628,7 +628,7 @@ table.data tr:hover td{background:var(--hover-bg,#fafbfc)}
   <aside class="sidebar">
     <div class="sb-logo">
       <span class="bolt">⚡</span>
-      <span>볼타레스 AS</span>
+      <span>폼즈 AS</span>
     </div>
     <nav class="sb-nav">
       <button class="sb-item active" data-tab="dashboard">
@@ -917,7 +917,7 @@ table.data tr:hover td{background:var(--hover-bg,#fafbfc)}
                 <th>출고일</th>
                 <th>처리일</th>
                 <th style="text-align:right">청구금액</th>
-                <th>상태</th>
+                <th style="text-align:center;width:90px">외관 상태</th>
               </tr>
             </thead>
             <tbody></tbody>
@@ -1003,7 +1003,7 @@ table.data tr:hover td{background:var(--hover-bg,#fafbfc)}
             <div class="sub">PCB 72,000 / LCD 65,000 / MB 23,000<br><span style="color:var(--text-3);font-size:11px;">+ 세척비 7,000 / S/W 설치 3,000원 (작업당)</span></div>
           </div>
           <div class="cost-box">
-            <div class="icon-line">👤 볼타레스 AS 비용</div>
+            <div class="icon-line">👤 폼즈 AS 비용</div>
             <div class="v" id="ven-actual">—</div>
             <div class="sub" id="ven-actual-sub">—</div>
           </div>
@@ -1552,7 +1552,7 @@ function renderKPI() {
 
   const kpis = [
     {label:'총 작업 수량', val:fmt.num(total), unit:'건', color:'slate', icon:'wrench', foot:'필터 적용 기준'},
-    {label:'볼타레스 AS 청구액', val:fmt.num(sumBilled), unit:'원', color:'green', icon:'won', foot:'공임만 · 부품비 0원 (티오더 지급분)'},
+    {label:'폼즈 AS 청구액', val:fmt.num(sumBilled), unit:'원', color:'green', icon:'won', foot:'공임만 · 부품비 0원 (티오더 지급분)'},
     {label:'건당 평균 청구액', val:fmt.num(Math.round(avgBilled)), unit:'원', color:'amber', icon:'calc', foot:'건당 공임'},
     {label:'복합수리 비율', val:multiPct.toFixed(0), unit:'%', color:'purple', icon:'layers', foot:`${multi}건 / ${total}건`},
     {label:'평균 처리 리드타임', val:avgLead.toFixed(1), unit:'일', color:'cyan', icon:'clock', foot:'수리등록 ~ 출고 소요일'},
@@ -2021,8 +2021,9 @@ function renderShipping() {
   const startIdx = (state.shippingPage - 1) * pageSize;
   const rowsToShow = rows.slice(startIdx, startIdx + pageSize);
 
+  // ⭐ v2.71a: 상태(출고완료 배지) 컬럼 → '외관 상태' 컬럼 — 출고 여부는 출고일로 충분,
+  //   여기엔 제품 등급(B급)만 가운데 정렬로 표기. B급이 아니면 '-'.
   tbody.innerHTML = rowsToShow.map(r => {
-    let tagClass = r.status === '출고대기' ? 'wait' : 'done';
     return `
       <tr>
         <td>${r.no}</td>
@@ -2032,7 +2033,7 @@ function renderShipping() {
         <td>${r.shipDate}</td>
         <td>${r.processDays !== null ? r.processDays.toFixed(1)+'일' : '-'}</td>
         <td style="text-align:right;font-variant-numeric:tabular-nums">${r.billed ? fmt.num(r.billed)+'원' : '-'}</td>
-        <td><span class="tag ${tagClass}">${r.status}</span>${r.bgrade ? ' <span class="tag" style="background:rgba(245,158,11,.14);color:#f59e0b;border:1px solid rgba(245,158,11,.45);font-weight:700;">B급</span>' : ''}</td>
+        <td style="text-align:center">${r.bgrade ? '<span class="tag" style="background:rgba(245,158,11,.14);color:#f59e0b;border:1px solid rgba(245,158,11,.45);font-weight:700;">B급</span>' : '<span style="color:var(--text-3)">-</span>'}</td>
       </tr>`;
   }).join('') || '<tr><td colspan="8"><div class="empty">데이터가 없습니다</div></td></tr>';
 
@@ -2331,7 +2332,7 @@ function renderCost() {
       labels,
       datasets:[
         { label:'태클라스트 단가', data:estData, backgroundColor:'#fda4af', borderRadius:6 },
-        { label:'볼타레스 AS 비용', data:actData, backgroundColor:'#86efac', borderRadius:6 },
+        { label:'폼즈 AS 비용', data:actData, backgroundColor:'#86efac', borderRadius:6 },
       ],
     },
     options:{
