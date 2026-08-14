@@ -1940,15 +1940,40 @@ function renderShipping() {
   // 처리일(등록일~출고일) 매칭용은 전체 entries 기준
   // (출고일 필터로 본 항목의 등록일은 다른 기간일 수 있음)
   const allEntries = state.raw.entries || [];
-  const entryMap = new Map(allEntries.map(e => [e.serial, e]));
+  // ⭐ v2.71b: 재인입(같은 시리얼 2차 수리) 대응 — 출고 행마다 '그 출고일 이전 등록된 가장 최근' 수리 기록을 짝지음.
+  //   기존 Map은 시리얼당 마지막 기록만 남아, 2차를 무상 처리하면 1차 출고 행의 청구금액까지 0원으로 보였음.
+  //   이제 1차 출고 행 ↔ 1차 수리(유상), 재출고 행 ↔ 2차 수리(무상)가 정확히 분리됨.
+  const entriesBySerial = new Map();
+  allEntries.forEach(e => {
+    if(!entriesBySerial.has(e.serial)) entriesBySerial.set(e.serial, []);
+    entriesBySerial.get(e.serial).push(e);
+  });
+  entriesBySerial.forEach(l => l.sort((a, b) => new Date(a.date) - new Date(b.date)));
+  const dayKey = (v) => { const d = new Date(v); return isNaN(d) ? '' : `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
+  const entryForShip = (s) => {
+    const l = entriesBySerial.get(s.serial);
+    if(!l || !l.length) return undefined;
+    if(l.length === 1) return l[0];
+    const sk = dayKey(s.shipDate);
+    if(!sk) return l[l.length - 1];
+    for(let i = l.length - 1; i >= 0; i--) { const ek = dayKey(l[i].date); if(ek && ek <= sk) return l[i]; }
+    return l[0];
+  };
 
-  // 출고 = ship에 있음, 미출고 = entries에 있는데 ship에 없음
-  const shippedSerials = new Set(ship.map(s => s.serial));
-  const pending = entries.filter(e => !shippedSerials.has(e.serial));
+  // 출고 = ship에 있음 / 미출고 = '이 수리 건 등록일 이후'의 출고 기록이 없는 건
+  // ⭐ v2.71b: 재인입 2차가 아직 재출고 전이면(1차 출고 기록만 있음) 출고 대기로 정확히 분류
+  const shipsBySerial = new Map();
+  ship.forEach(s => { if(!shipsBySerial.has(s.serial)) shipsBySerial.set(s.serial, []); shipsBySerial.get(s.serial).push(s); });
+  const pending = entries.filter(e => {
+    const l = shipsBySerial.get(e.serial);
+    if(!l || !l.length) return true;
+    const ek = dayKey(e.date);
+    return !l.some(s => { const sk = dayKey(s.shipDate); return sk && (!ek || sk >= ek); });
+  });
 
   const rows = [];
   ship.forEach((s, idx) => {
-    const e = entryMap.get(s.serial);
+    const e = entryForShip(s);
     const repairDate = e ? new Date(e.date) : null;
     const shipDate = s.shipDate ? new Date(s.shipDate) : null;
     // 처리일 = 등록일~출고일 간격 (일 단위)
