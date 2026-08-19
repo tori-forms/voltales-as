@@ -1096,7 +1096,7 @@ table.data tr:hover td{background:var(--hover-bg,#fafbfc)}
  *     예: 'https://script.google.com/macros/s/AKfy...../exec'
  *  ── DEMO_MODE = true 로 두면 오프라인 mock 데이터로 동작합니다.
  * ═════════════════════════════════════════════════════════════ */
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwYn7pkGr5ZVSMAHap1r2bj8nCR4sUNoy3bEj8sR2gui7o9qkidRJF2Tb7_4C8fZ0KZBA/exec';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyC-Rw0N_TYMl5GCuXFE96A_EDJ8b6eq-o_y944Ka1IbXjV0ug2t0pZMiL3FOIVbd9L3g/exec';   // ⭐ v2.72a: 2026-08-19 GAS 재배포로 URL 교체
 const DEMO_MODE = APPS_SCRIPT_URL.startsWith('__');
 
 /* 부품 단가 (업체 비교용) - 토리님이 제공한 시안 그대로 */
@@ -2764,8 +2764,24 @@ async function exportExcel() {
     return;
   }
 
+  // ⭐ v2.72: 조회 조건을 파일에 명시 — 필터가 걸린 자료인지 나중에도 구분 가능하도록 (월 마감 대사 혼선 방지)
+  const _f = state.filter;
+  const _condParts = [];
+  _condParts.push('기간: ' + (_f.dateFrom || _f.dateTo ? (_f.dateFrom || '처음') + ' ~ ' + (_f.dateTo || '오늘')
+    : _f.period === 'thisMonth' ? '이번 달' : _f.period === 'lastMonth' ? '지난 달' : '전체'));
+  if(_f.year && _f.year !== 'all') _condParts.push('연도: ' + _f.year);
+  if(_f.quarter && _f.quarter !== 'all') _condParts.push('분기: ' + _f.quarter);
+  _condParts.push('기종: ' + (_f.model === 'all' ? '전체' : _f.model));
+  if(_f.worktype && _f.worktype !== 'all') _condParts.push('작업: ' + (_f.worktype === 'single' ? '단일' : '복합'));
+  if(_f.serial) _condParts.push('시리얼 검색: ' + _f.serial);
+  const _condStr = _condParts.join(' · ');
+  const _sumBilledX = data.reduce((s,e) => s + Number(e.total||0) + partsBilled(e), 0);
+
   // 데이터 헤더 + 행
   const rows = [
+    ['조회 조건', _condStr],
+    ['합계', data.length + '건 / ' + _sumBilledX.toLocaleString('ko-KR') + '원'],
+    [],
     ['시리얼번호','기종','수리항목','청구금액'],
     ...data.map(e => [
       e.serial,
@@ -2786,9 +2802,9 @@ async function exportExcel() {
     {wch:14}, // 청구금액
   ];
 
-  // 청구금액 컬럼 (D, index 3) 숫자 포맷 (천단위 콤마)
+  // 청구금액 컬럼 (D, index 3) 숫자 포맷 (천단위 콤마) — 데이터는 5행부터(조건 2행+빈줄+헤더)
   const range = XLSX.utils.decode_range(ws['!ref']);
-  for(let R = 1; R <= range.e.r; R++) {
+  for(let R = 4; R <= range.e.r; R++) {
     const cellAddr = XLSX.utils.encode_cell({r:R, c:3});
     if(ws[cellAddr]) {
       ws[cellAddr].t = 'n';
@@ -2802,8 +2818,10 @@ async function exportExcel() {
 
   // 파일 다운로드
   const today = new Date().toISOString().slice(0,10);
-  XLSX.writeFile(wb, `AS_현황_${today}.xlsx`);
-  toast('엑셀 파일로 내보냈습니다');
+  // ⭐ v2.72: 기종 필터가 걸려 있으면 파일명에도 표기 — 전체 자료와 헷갈리지 않게
+  const _fnTag = (_f.model && _f.model !== 'all') ? '_' + _f.model : '';
+  XLSX.writeFile(wb, `AS_현황_${today}${_fnTag}.xlsx`);
+  toast('엑셀 파일로 내보냈습니다' + (_fnTag ? ` (기종 필터: ${_f.model})` : ''));
 }
 
 /* ═══════════════════════════════════════════════════════════════
