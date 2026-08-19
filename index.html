@@ -1246,16 +1246,40 @@ async function loadData() {
   if(DEMO_MODE) {
     return generateDemoData();
   }
-  // ⭐ 압축(fmt=2) fetch 우선 — 전송량 약 1/7 (600KB→88KB). 실패 시 JSONP(비압축) 폴백.
+  // ⭐ v2.73: GitHub CDN 채널 1순위 — 서버가 5분마다 발행해둔 client.json(민감정보 제거본)을
+  //   CDN에서 즉시 읽음(~1초). 신선도 20분 초과·실패 시 GAS 압축 fetch → JSONP 순 폴백.
   let resp = null;
   if(typeof fetch === 'function' && typeof DecompressionStream === 'function') {
-    try { resp = await loadViaFetchZ(); } catch(e) { resp = null; }
+    try { resp = await loadViaGitHub(); } catch(e) { resp = null; }
+    if(!resp) { try { resp = await loadViaFetchZ(); } catch(e) { resp = null; } }
   }
   if(!resp) resp = await loadJSONP();
   if(!resp || resp.ok !== true) {
     throw new Error(resp && resp.error ? resp.error : '서버 응답이 비정상입니다');
   }
   return resp.data;
+}
+
+// ⭐ v2.73: GitHub 데이터 채널 — 사내전산과 같은 구조. 2분 버킷 캐시 + 429 시 10분 쿨다운.
+const GH_DATA_BASE = 'https://raw.githubusercontent.com/tori-forms/forms-as/data/data';
+const GH_FRESH_MS = 20 * 60 * 1000;   // 발행 20분 초과분은 낡은 것으로 보고 GAS 폴백
+async function loadViaGitHub() {
+  if(window._ghSkipUntil && Date.now() < window._ghSkipUntil) throw new Error('gh cooldown');
+  const bucket = Math.floor(Date.now() / 120000);
+  const res = await fetch(GH_DATA_BASE + '/client.json?t=' + bucket);
+  if(!res.ok) {
+    if(res.status === 429) window._ghSkipUntil = Date.now() + 600000;
+    throw new Error('gh http ' + res.status);
+  }
+  const obj = await res.json();
+  if(!obj || !obj._z) throw new Error('gh format');
+  if(obj.t && (Date.now() - Number(obj.t)) > GH_FRESH_MS) throw new Error('gh stale');
+  const bytes = Uint8Array.from(atob(obj._z), c => c.charCodeAt(0));
+  const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
+  const jsonTxt = await new Response(stream).text();
+  const parsed = JSON.parse(jsonTxt);
+  if(!parsed || parsed.ok !== true) throw new Error('gh payload');
+  return parsed;
 }
 
 async function loadViaFetchZ() {
