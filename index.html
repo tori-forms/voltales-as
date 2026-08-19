@@ -1096,7 +1096,7 @@ table.data tr:hover td{background:var(--hover-bg,#fafbfc)}
  *     예: 'https://script.google.com/macros/s/AKfy...../exec'
  *  ── DEMO_MODE = true 로 두면 오프라인 mock 데이터로 동작합니다.
  * ═════════════════════════════════════════════════════════════ */
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyC-Rw0N_TYMl5GCuXFE96A_EDJ8b6eq-o_y944Ka1IbXjV0ug2t0pZMiL3FOIVbd9L3g/exec';   // ⭐ v2.72a: 2026-08-19 GAS 재배포로 URL 교체
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby4q1TNBU87K2LBDJAGrpBNlwBn4wsBIxDZKCUq_wdTnheLULUuQXipq8QNyDV2e7xyZw/exec';   // ⭐ v2.72b: 고객사 GAS 배포 불안정(익명 load 404) → 검증된 사내 GAS 배포로 통합 (client=1 경로가 민감정보 제거)
 const DEMO_MODE = APPS_SCRIPT_URL.startsWith('__');
 
 /* 부품 단가 (업체 비교용) - 토리님이 제공한 시안 그대로 */
