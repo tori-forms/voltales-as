@@ -1412,11 +1412,33 @@ function applyFilter() {
   const all = state.raw.entries || [];
   const shipLog = state.raw.shipLog || [];
 
-  // 시리얼별 출고일 맵 (출고일 기준 필터링용)
-  const shipDateMap = new Map();
+  // ⭐ v2.72: 재인입(같은 시리얼 2차 수리) 대응 — 수리건마다 '등록일 이후 첫 출고일'을 짝지음.
+  //   기존 Map은 시리얼당 마지막 출고일 하나만 남아, 재작업 제품이 재출고되면
+  //   과거에 출고했던 1차 건까지 최신 출고월로 끌려가 월별 건수·금액이 소급 변동했음.
+  //   (월초 엑셀 내보내기와 월말 수치가 달라지던 원인)
+  const _dayKeyF = (v) => { const d = new Date(v); return isNaN(d) ? '' : d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
+  const _shipsBySerialF = new Map();
   shipLog.forEach(s => {
-    if(s.serial && s.shipDate) shipDateMap.set(s.serial, s.shipDate);
+    if(!s.serial || !s.shipDate) return;
+    if(!_shipsBySerialF.has(s.serial)) _shipsBySerialF.set(s.serial, []);
+    _shipsBySerialF.get(s.serial).push(s);
   });
+  _shipsBySerialF.forEach(l => l.sort((a,b) => _dayKeyF(a.shipDate).localeCompare(_dayKeyF(b.shipDate))));
+  const _entryCntBySerial = new Map();
+  all.forEach(e => { if(e.serial) _entryCntBySerial.set(e.serial, (_entryCntBySerial.get(e.serial) || 0) + 1); });
+  const shipDateForEntry = (e) => {
+    const l = _shipsBySerialF.get(e.serial);
+    if(!l || !l.length) return undefined;
+    const ek = _dayKeyF(e.date);
+    if(ek) {
+      for(let i = 0; i < l.length; i++) { const sk = _dayKeyF(l[i].shipDate); if(sk && sk >= ek) return l[i].shipDate; }
+    }
+    // 등록일 이후 출고 기록이 없는 경우:
+    //  - 이 시리얼의 수리 기록이 1건뿐이면 재인입이 아님 → 날짜 표기 이상 관용으로 마지막 출고일 사용(기존 동작 유지)
+    //  - 수리 기록이 여러 건(재인입)이면 이 건은 아직 재출고 전 → 미출고(출고대기)로 분류
+    if((_entryCntBySerial.get(e.serial) || 0) <= 1) return l[l.length - 1].shipDate;
+    return undefined;
+  };
 
   let from = f.dateFrom ? new Date(f.dateFrom) : null;
   let to = f.dateTo ? new Date(f.dateTo + 'T23:59:59') : null;
@@ -1454,7 +1476,7 @@ function applyFilter() {
 
   // 출고일 기준 1차 필터링 (yymm 제외 - 드롭다운 옵션 추출용)
   const baseFiltered = all
-    .map(e => ({...e, shipDate: shipDateMap.get(e.serial)}))
+    .map(e => ({...e, shipDate: shipDateForEntry(e)}))
     .filter(e => {
       // 출고된 것만
       if(!e.shipDate) return false;
@@ -2204,13 +2226,25 @@ function _peRows() {
   const entries = state.raw.entries || [];
   const stockByName = {};
   stock.forEach(st => { stockByName[String(st.name).trim().toLowerCase()] = st; });
-  const entryBySerial = {};
-  entries.forEach(e => { if(e.serial) entryBySerial[String(e.serial).trim()] = e; });
+  // ⭐ v2.72: 재인입 대응 — 출고 행마다 '그 출고일 이전 등록된 가장 최근' 수리 기록을 짝지음
+  const _peDayKey = (v) => { const d = new Date(v); return isNaN(d) ? '' : d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
+  const entriesBySer = {};
+  entries.forEach(e => { const k = String(e.serial||'').trim(); if(k){ (entriesBySer[k] = entriesBySer[k] || []).push(e); } });
+  Object.values(entriesBySer).forEach(l => l.sort((a,b) => _peDayKey(a.date).localeCompare(_peDayKey(b.date))));
+  const _peEntryForShip = (sh) => {
+    const l = entriesBySer[String(sh.serial||'').trim()];
+    if(!l || !l.length) return undefined;
+    if(l.length === 1) return l[0];
+    const sk = _peDayKey(sh.shipDate);
+    if(!sk) return l[l.length - 1];
+    for(let i = l.length - 1; i >= 0; i--) { const ek = _peDayKey(l[i].date); if(ek && ek <= sk) return l[i]; }
+    return l[0];
+  };
   const fModel = document.getElementById('pe-model')?.value || '';
   const fPart = document.getElementById('pe-part')?.value || '';
   return ships
     .map(sh => {
-      const e = entryBySerial[String(sh.serial||'').trim()];
+      const e = _peEntryForShip(sh);
       const parts = e ? Object.keys(_parsePartsObj(e.parts))
         .map(n => stockByName[String(n).trim().toLowerCase()])
         .filter(st => st && !_isConsumablePart(st))
@@ -2960,6 +2994,19 @@ async function init() {
 
   try {
     state.raw = await loadData();
+
+    // ⭐ v2.72: 출고 이중 기록 방어 — 같은 시리얼+같은 날짜 중복 행은 첫 행만 사용
+    if(Array.isArray(state.raw.shipLog)) {
+      const _sdSeen = new Set();
+      state.raw.shipLog = state.raw.shipLog.filter(s => {
+        const d = new Date(s.shipDate);
+        const dk = isNaN(d) ? String(s.shipDate || '') : d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+        const k = String(s.serial || '') + '|' + dk;
+        if(_sdSeen.has(k)) return false;
+        _sdSeen.add(k);
+        return true;
+      });
+    }
 
     // ⭐ 출고연도 드롭다운 채우기 (출고이력의 연도 추출)
     populateYearOptions();
