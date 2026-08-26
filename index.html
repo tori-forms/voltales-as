@@ -726,6 +726,7 @@ table.data tr:hover td{background:var(--hover-bg,#fafbfc)}
         <button class="chip2 active" data-model="all">전체</button>
         <button class="chip2" data-model="S2PRO_N">S2PRO_N</button>
         <button class="chip2" data-model="S2_N">S2_N</button>
+        <button class="chip2" data-model="T2N">T2N</button>
       </div>
       <span class="fb-div"></span>
       <!-- 수리유형 칩 -->
@@ -902,9 +903,19 @@ table.data tr:hover td{background:var(--hover-bg,#fafbfc)}
     <div class="tab-pane" id="pane-shipping" hidden>
       <div class="grid-4" id="ship-kpi"></div>
       <div class="card">
-        <div class="card-title">
-          <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"/><circle cx="17" cy="18" r="2"/><circle cx="7" cy="18" r="2"/></svg>
-          출고 목록
+        <div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+          <span style="display:inline-flex;align-items:center;gap:8px;">
+            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"/><circle cx="17" cy="18" r="2"/><circle cx="7" cy="18" r="2"/></svg>
+            출고 목록
+          </span>
+          <!-- ⭐ v2.74: 페이지당 조회 건수 선택 (티오더 요청 — 최대 '전체 보기') -->
+          <select id="ship-page-size" onchange="setShippingPageSize(this.value)" style="height:30px;padding:0 8px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text);font-size:12.5px;">
+            <option value="20">20개씩 보기</option>
+            <option value="50">50개씩 보기</option>
+            <option value="100">100개씩 보기</option>
+            <option value="200">200개씩 보기</option>
+            <option value="all">전체 보기</option>
+          </select>
         </div>
         <div class="table-wrap">
           <table class="data" id="ship-table">
@@ -1596,8 +1607,12 @@ function renderKPI() {
   const repeats = reentries.length;   // 재입고(재인입) 총 건수
   const repeatPct = shippedCnt ? (_reCnt.defect / shippedCnt * 100) : 0;
 
+  // ⭐ v2.75: 작업 분류 — 논배터리 재작업(nonbat 포함) vs 일반 수리(T2N AS 등)
+  const nonbatCnt = data.filter(e => (e.works||[]).includes('nonbat')).length;
+  const generalCnt = total - nonbatCnt;
+
   const kpis = [
-    {label:'총 작업 수량', val:fmt.num(total), unit:'건', color:'slate', icon:'wrench', foot:'필터 적용 기준'},
+    {label:'총 작업 수량', val:fmt.num(total), unit:'건', color:'slate', icon:'wrench', foot:`논배터리 재작업 ${fmt.num(nonbatCnt)} · 일반 수리 ${fmt.num(generalCnt)}`},
     {label:'폼즈 AS 청구액', val:fmt.num(sumBilled), unit:'원', color:'green', icon:'won', foot:'공임만 · 부품비 0원 (티오더 지급분)'},
     {label:'건당 평균 청구액', val:fmt.num(Math.round(avgBilled)), unit:'원', color:'amber', icon:'calc', foot:'건당 공임'},
     {label:'복합수리 비율', val:multiPct.toFixed(0), unit:'%', color:'purple', icon:'layers', foot:`${multi}건 / ${total}건`},
@@ -1980,15 +1995,15 @@ function renderHeatmap() {
 /* ═══════════════════════════════════════════════════════════════
  *  RENDER: 출고 목록 탭
  * ═════════════════════════════════════════════════════════════ */
-function renderShipping() {
+// ⭐ v2.74: 출고 목록 행 계산 — 화면(renderShipping)과 엑셀 내보내기가 '완전히 같은 목록·순서'를
+//   쓰도록 공용 함수로 분리. (기존 엑셀은 수리건 기준 별도 목록이라 화면 No.와 순서가 어긋났음)
+function computeShipRows() {
   const ship = state.filteredShip;
   const entries = state.filtered;
   // 처리일(등록일~출고일) 매칭용은 전체 entries 기준
   // (출고일 필터로 본 항목의 등록일은 다른 기간일 수 있음)
   const allEntries = state.raw.entries || [];
   // ⭐ v2.71b: 재인입(같은 시리얼 2차 수리) 대응 — 출고 행마다 '그 출고일 이전 등록된 가장 최근' 수리 기록을 짝지음.
-  //   기존 Map은 시리얼당 마지막 기록만 남아, 2차를 무상 처리하면 1차 출고 행의 청구금액까지 0원으로 보였음.
-  //   이제 1차 출고 행 ↔ 1차 수리(유상), 재출고 행 ↔ 2차 수리(무상)가 정확히 분리됨.
   const entriesBySerial = new Map();
   allEntries.forEach(e => {
     if(!entriesBySerial.has(e.serial)) entriesBySerial.set(e.serial, []);
@@ -2007,7 +2022,6 @@ function renderShipping() {
   };
 
   // 출고 = ship에 있음 / 미출고 = '이 수리 건 등록일 이후'의 출고 기록이 없는 건
-  // ⭐ v2.71b: 재인입 2차가 아직 재출고 전이면(1차 출고 기록만 있음) 출고 대기로 정확히 분류
   const shipsBySerial = new Map();
   ship.forEach(s => { if(!shipsBySerial.has(s.serial)) shipsBySerial.set(s.serial, []); shipsBySerial.get(s.serial).push(s); });
   const pending = entries.filter(e => {
@@ -2017,16 +2031,23 @@ function renderShipping() {
     return !l.some(s => { const sk = dayKey(s.shipDate); return sk && (!ek || sk >= ek); });
   });
 
+  // ⭐ v2.75: 재인입 회차 — 같은 시리얼의 몇 번째 수리인지 (1차=최초, 2차 이상=재인입)
+  const visitOf = (e) => {
+    if(!e) return 1;
+    const l = entriesBySerial.get(e.serial);
+    if(!l || l.length <= 1) return 1;
+    const i = l.indexOf(e);
+    return i >= 0 ? i + 1 : 1;
+  };
+
   const rows = [];
   ship.forEach((s, idx) => {
     const e = entryForShip(s);
     const repairDate = e ? new Date(e.date) : null;
     const shipDate = s.shipDate ? new Date(s.shipDate) : null;
-    // 처리일 = 등록일~출고일 간격 (일 단위)
     const processDays = (repairDate && shipDate)
       ? Math.max(0.1, (shipDate - repairDate) / 86400000)
       : null;
-    // 청구금액 = 공임(e.total) + 청구 대상 부품비 (현재 0)
     const billed = e ? Number(e.total||0) + partsBilled(e) : 0;
     rows.push({
       no: idx+1,
@@ -2034,10 +2055,12 @@ function renderShipping() {
       model: s.model || (e?.model || '-'),
       works: s.works || ((e?.works||[]).map(workName).join(' / ')),
       shipDate: s.shipDate || '-',
+      shipDay: dayKey(s.shipDate),   // ⭐ v2.74: 엑셀용 YYYY-MM-DD
+      visit: visitOf(e),             // ⭐ v2.75: 재인입 회차
       processDays,
       billed,
       status: '출고완료',
-      bgrade: !!(e && String(e.note || '').includes('[B급]')),   // ⭐ v2.71: B급 제품 표기
+      bgrade: !!(e && String(e.note || '').includes('[B급]')),
     });
   });
   pending.forEach((e) => {
@@ -2047,13 +2070,19 @@ function renderShipping() {
       model: e.model,
       works: (e.works||[]).map(workName).join(' / '),
       shipDate: '-',
+      shipDay: '',
+      visit: visitOf(e),
       processDays: null,
       billed: 0, // 미출고는 미청구
       status: '출고대기',
-      bgrade: String(e.note || '').includes('[B급]'),   // ⭐ v2.71: B급 제품 표기
+      bgrade: String(e.note || '').includes('[B급]'),
     });
   });
+  return rows;
+}
 
+function renderShipping() {
+  const rows = computeShipRows();
   // 통계
   const done = rows.filter(r => r.status === '출고완료').length;
   const wait = rows.filter(r => r.status === '출고대기').length;
@@ -2084,7 +2113,10 @@ function renderShipping() {
 
   // Table + 페이지네이션
   const tbody = document.querySelector('#ship-table tbody');
-  const pageSize = state.shippingPageSize;
+  // ⭐ v2.74: '전체 보기' 지원 — pageSize 'all'이면 한 번에 모두 표시
+  const pageSize = state.shippingPageSize === 'all' ? Math.max(1, rows.length) : Number(state.shippingPageSize) || 20;
+  const _psSel = document.getElementById('ship-page-size');
+  if(_psSel && _psSel.value !== String(state.shippingPageSize)) _psSel.value = String(state.shippingPageSize);
   const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
   // 페이지 범위 보정 (필터 변경 등으로 페이지 초과 시)
   if(state.shippingPage > totalPages) state.shippingPage = totalPages;
@@ -2131,6 +2163,13 @@ function renderShipping() {
 
 function goShippingPage(n) {
   state.shippingPage = n;
+  renderShipping();
+}
+
+/* ⭐ v2.74: 페이지당 조회 건수 변경 */
+function setShippingPageSize(v) {
+  state.shippingPageSize = (v === 'all') ? 'all' : (Number(v) || 20);
+  state.shippingPage = 1;
   renderShipping();
 }
 
@@ -2774,8 +2813,10 @@ function waitForXLSX(retries = 10) {
 }
 
 async function exportExcel() {
-  const data = state.filtered;
-  if(!data.length) { toast('내보낼 데이터가 없습니다','error'); return; }
+  // ⭐ v2.74: 화면의 출고 목록과 '완전히 같은 목록·같은 순서'로 내보내기 (No. 일치)
+  //   + 출고일 컬럼 추가 — 엑셀에서 출고일 기준 오름/내림차순 정렬 가능
+  const shipRows = computeShipRows();
+  if(!shipRows.length) { toast('내보낼 데이터가 없습니다','error'); return; }
 
   // SheetJS 로드 대기 (최대 5초)
   try {
@@ -2799,19 +2840,25 @@ async function exportExcel() {
   if(_f.worktype && _f.worktype !== 'all') _condParts.push('작업: ' + (_f.worktype === 'single' ? '단일' : '복합'));
   if(_f.serial) _condParts.push('시리얼 검색: ' + _f.serial);
   const _condStr = _condParts.join(' · ');
-  const _sumBilledX = data.reduce((s,e) => s + Number(e.total||0) + partsBilled(e), 0);
+  const _doneRows = shipRows.filter(r => r.status === '출고완료');
+  const _sumBilledX = _doneRows.reduce((s,r) => s + (r.billed||0), 0);
 
-  // 데이터 헤더 + 행
+  // 데이터 헤더 + 행 (화면 출고 목록과 동일 순서 — No. 일치)
   const rows = [
     ['조회 조건', _condStr],
-    ['합계', data.length + '건 / ' + _sumBilledX.toLocaleString('ko-KR') + '원'],
+    ['합계', '출고완료 ' + _doneRows.length + '건 / ' + _sumBilledX.toLocaleString('ko-KR') + '원' +
+      (shipRows.length > _doneRows.length ? ' · 출고대기 ' + (shipRows.length - _doneRows.length) + '건' : '')],
     [],
-    ['시리얼번호','기종','수리항목','청구금액'],
-    ...data.map(e => [
-      e.serial,
-      e.model || '',
-      (e.works||[]).map(workName).join(' / '),
-      Number(e.total||0) + partsBilled(e),
+    ['No','시리얼번호','기종','수리항목','출고일','재인입','청구금액','상태'],
+    ...shipRows.map(r => [
+      r.no,
+      r.serial,
+      r.model || '',
+      r.works || '',
+      r.shipDay || '-',
+      (r.visit && r.visit >= 2) ? (r.visit + '차') : '1차',   // ⭐ v2.75: 재인입 회차 (티오더 요청)
+      r.billed,
+      r.status,
     ]),
   ];
 
@@ -2820,20 +2867,21 @@ async function exportExcel() {
 
   // 컬럼 너비 설정
   ws['!cols'] = [
+    {wch:6},  // No
     {wch:22}, // 시리얼번호
     {wch:12}, // 기종
-    {wch:36}, // 수리항목
-    {wch:14}, // 청구금액
+    {wch:34}, // 수리항목
+    {wch:12}, // 출고일
+    {wch:8},  // 재인입
+    {wch:12}, // 청구금액
+    {wch:10}, // 상태
   ];
 
-  // 청구금액 컬럼 (D, index 3) 숫자 포맷 (천단위 콤마) — 데이터는 5행부터(조건 2행+빈줄+헤더)
+  // 숫자 포맷 — 데이터는 5행부터(조건 2행+빈줄+헤더). 청구금액=G열(index 6)
   const range = XLSX.utils.decode_range(ws['!ref']);
   for(let R = 4; R <= range.e.r; R++) {
-    const cellAddr = XLSX.utils.encode_cell({r:R, c:3});
-    if(ws[cellAddr]) {
-      ws[cellAddr].t = 'n';
-      ws[cellAddr].z = '#,##0';
-    }
+    const cAmt = XLSX.utils.encode_cell({r:R, c:6});
+    if(ws[cAmt]) { ws[cAmt].t = 'n'; ws[cAmt].z = '#,##0'; }
   }
 
   // 워크북 생성 + 시트 추가
