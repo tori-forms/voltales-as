@@ -1237,7 +1237,8 @@ function partsCost(entry) { return partsBilled(entry); }
 /* 수리항목 한글 이름 매핑 */
 const WORK_KO = {
   pcb:'PCB 교체', panel:'LCD 교체', board:'MB수리', nonbat:'논배터리',
-  battery:'배터리 교체', lcd:'LCD 교체', mb:'MB수리'
+  battery:'배터리 교체', lcd:'LCD 교체', mb:'MB수리',
+  cover:'백커버 교체', etc:'기타작업'   // ⭐ v2.75b: 백커버(신설)·기타 작업 표기
 };
 function workName(k) { return WORK_KO[k] || k; }
 
