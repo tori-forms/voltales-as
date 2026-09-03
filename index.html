@@ -1238,7 +1238,8 @@ function partsCost(entry) { return partsBilled(entry); }
 
 /* 수리항목 한글 이름 매핑 */
 const WORK_KO = {
-  pcb:'PCB 교체', panel:'LCD 교체', board:'MB수리', nonbat:'논배터리',
+  pcb:'PCB 교체', panel:'LCD 교체', board:'MB수리', nonbat:'논배터리(백커버 미포함)',
+  nonbat_full:'논배터리(백커버 포함)',   // ⭐ v2.75d: 논배터리 2종 분리 (2026-09 단가 개편)
   battery:'배터리 교체', lcd:'LCD 교체', mb:'MB수리',
   cover:'백커버 교체', etc:'기타작업'   // ⭐ v2.75b: 백커버(신설)·기타 작업 표기
 };
@@ -1611,7 +1612,7 @@ function renderKPI() {
   const repeatPct = shippedCnt ? (_reCnt.defect / shippedCnt * 100) : 0;
 
   // ⭐ v2.75: 작업 분류 — 논배터리 재작업(nonbat 포함) vs 일반 수리(T2N AS 등)
-  const nonbatCnt = data.filter(e => (e.works||[]).includes('nonbat')).length;
+  const nonbatCnt = data.filter(e => (e.works||[]).includes('nonbat') || (e.works||[]).includes('nonbat_full')).length;   // ⭐ v2.75d: 논배 2종
   const generalCnt = total - nonbatCnt;
 
   const kpis = [
@@ -1817,7 +1818,7 @@ function renderCostStruct() {
   });
 
   // 부품 항목별 세부 (LCD 부품: N개 / 합계 N원)
-  const partLabelKo = { pcb:'PCB 부품', panel:'LCD 부품', board:'MB(메인보드 부분수리) 부품', nonbat:'논배터리 부품', battery:'배터리 부품' };
+  const partLabelKo = { pcb:'PCB 부품', panel:'LCD 부품', board:'MB(메인보드 부분수리) 부품', nonbat:'논배터리 부품', nonbat_full:'논배터리(백커버 포함) 부품', cover:'백커버 부품', battery:'배터리 부품', etc:'기타작업 부품' };   // ⭐ v2.75d
   const partDetailRows = Object.entries(partUsage)
     .sort((a,b) => b[1].sum - a[1].sum)
     .map(([w, u]) => `<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-3);padding:2px 0;">
@@ -2380,16 +2381,26 @@ function renderCost() {
   const ps = (state.raw && state.raw.priceSettings) || {};
   const TAECLAST = { pcb:72000, panel:65000, board:23000, wash:7000, sw:3000 };
   const FORMS_LABOR = { pcb:15180, panel:10450, board:10450 };
-  const NONBAT_PRICE_PER = Number(ps.nonbat) || 18700;
+  // ⭐ v2.75d: 논배 2종 단가 — 백커버 포함(nonbat_full) 18,700 / 미포함(nonbat) 10,800 (서버 단가 설정 우선)
+  const NONBAT_FULL_PER = Number(ps.nonbat_full) || 18700;
+  const NONBAT_PRICE_PER = (Number(ps.nonbat) && Number(ps.nonbat) !== 18700) ? Number(ps.nonbat) : 10800;
+  // 과거 데이터(단가 개편 이전의 'nonbat' 단독 기록)는 당시 단가 18,700로 집계
+  const NB_CUTOFF = '2026-09-03';
+  const nbLaborOf = e => {
+    const ws = e.works || [];
+    if(ws.includes('nonbat_full')) return NONBAT_FULL_PER;
+    const d = String(e.shipDate || e.date || '');
+    return d && d < NB_CUTOFF ? 18700 : NONBAT_PRICE_PER;
+  };
   const NEW_PRICE = Number(ps.newProduct) || NEW_UNIT_PRICE;
 
   // 1) 논배터리 AS 비용 vs 새제품 (논배터리 작업 entry만, 논배터리 공임+부품)
-  const nonbatData = data.filter(e => (e.works||[]).includes('nonbat'));
+  const nonbatData = data.filter(e => (e.works||[]).includes('nonbat') || (e.works||[]).includes('nonbat_full'));
   const nonbatCount = nonbatData.length;
   const totalAS = nonbatData.reduce((s, e) => {
     const mp = modelPartsAll[normalizeModel(e.model)] || {};
-    const nbParts = Number(mp['nonbat']) || 0;
-    return s + NONBAT_PRICE_PER + nbParts;
+    const nbParts = Number(mp['nonbat_full']) || Number(mp['nonbat']) || 0;
+    return s + nbLaborOf(e) + nbParts;
   }, 0);
   const totalNew = nonbatCount * NEW_PRICE;
   const save = totalNew - totalAS;
@@ -2479,9 +2490,9 @@ function renderCost() {
     const ws = new Set(e.works || []);
     const mp = modelPartsAll[normalizeModel(e.model)] || {};
 
-    // (1) 논배터리 절감: 새제품 가격 - (공임 + 부품비)
-    if(ws.has('nonbat')) {
-      const nbCost = NONBAT_PRICE_PER + (Number(mp.nonbat) || 0);
+    // (1) 논배터리 절감: 새제품 가격 - (공임 + 부품비)   ⭐ v2.75d: 논배 2종
+    if(ws.has('nonbat') || ws.has('nonbat_full')) {
+      const nbCost = nbLaborOf(e) + (Number(mp.nonbat_full) || Number(mp.nonbat) || 0);
       monthly[ym].nonbat += (NEW_PRICE - nbCost);
     }
 
@@ -2547,6 +2558,7 @@ function renderCost() {
 // ⭐ v2.75a: 기능 업데이트 소식 — 배포할 때 여기에 항목을 추가하면 알림 센터에 표시됩니다 (최신이 위).
 //   '정보' 분류라 미확인 뱃지(긴급·경고만 카운트)에는 영향 없음.
 const UPDATE_NOTES = [
+  { date: '2026-09-03', title: '🔧 수리 항목 체계 개편', msg: '논배터리 작업이 "백커버 교체 포함"과 "백커버 교체 미포함(커버 재사용)"으로 구분되고, 백커버 단독 교체·배터리 교체·기타 작업 항목이 추가되었습니다. 수리 내역과 엑셀 내보내기에 새 항목명이 그대로 표기됩니다.' },
   { date: '2026-08-27', title: '📦 출고 목록·엑셀 내보내기 개선', msg: '엑셀에 출고일자·재인입 회차 컬럼이 추가되고, 화면 출고 목록과 No·순서가 완전히 일치합니다. 출고 목록 조회 건수를 20개~전체 보기 중 선택할 수 있습니다.' },
   { date: '2026-08-27', title: '📱 T2N 기종 추가', msg: '신제품 T2N의 AS 현황이 대시보드에 포함됩니다. 상단 기종 필터에서 T2N을 선택해 조회할 수 있습니다.' },
   { date: '2026-08-19', title: '📊 월별 집계 정확도 개선', msg: '재작업 제품의 재출고가 과거 월 집계에 영향을 주던 표시 오류를 수정했습니다. 출고 건은 해당 출고 월에 고정되며, 월 마감 후 수치가 변동되지 않습니다. 엑셀 내보내기 상단에 조회 조건과 합계가 함께 표기됩니다.' },
