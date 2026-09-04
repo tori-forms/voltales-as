@@ -2201,9 +2201,35 @@ function _parsePartsObj(raw) {
 function renderExchange() {
   // ⭐ v2.70k: 같은 id 중복 행(과거 이중 등록 잔재) 제거 — 사내전산과 건수 일치 (577 vs 584 불일치 해소)
   const _seenX = new Set();
-  const ex = ((state.raw && state.raw.exchange) || []).filter(x => {
+  const exAll = ((state.raw && state.raw.exchange) || []).filter(x => {
     const k = String(x.id || ((x.serial||'') + '|' + (x.date||'')));
     if(_seenX.has(k)) return false; _seenX.add(k); return true;
+  });
+  // ⭐ v2.75f: 상단 공통 필터(기간·연도·분기·기종·제조년월·시리얼) 적용 — 처리일(x.date) 기준.
+  //   (기존엔 이 탭만 필터를 무시하고 전체를 보여줬음)
+  const f = state.filter || {};
+  let _from = f.dateFrom ? new Date(f.dateFrom) : null;
+  let _to = f.dateTo ? new Date(f.dateTo + 'T23:59:59') : null;
+  if(f.period && f.period !== 'all' && !f.dateFrom) {
+    const now = new Date();
+    if(f.period === 'thisMonth') { _from = new Date(now.getFullYear(), now.getMonth(), 1); _to = now; }
+    else if(f.period === 'lastMonth') { _from = new Date(now.getFullYear(), now.getMonth()-1, 1); _to = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59); }
+  }
+  const _QR = {Q1:[1,3], Q2:[4,6], Q3:[7,9], Q4:[10,12]};
+  const _isQ = ['Q1','Q2','Q3','Q4'].includes(f.quarter);
+  const _hasYear = f.year && f.year !== 'all';
+  const ex = exAll.filter(x => {
+    const d = x.date ? new Date(x.date) : null;
+    const okD = d && !isNaN(d.getTime());
+    if((_from || _to || _isQ || _hasYear) && !okD) return false;
+    if(_from && d < _from) return false;
+    if(_to && d > _to) return false;
+    if(_hasYear && d.getFullYear() !== Number(f.year)) return false;
+    if(_isQ) { const m = d.getMonth()+1; const [s1,e1] = _QR[f.quarter]; if(m < s1 || m > e1) return false; }
+    if(f.model && f.model !== 'all' && normalizeModel(x.model) !== normalizeModel(f.model)) return false;
+    if(f.yymm && f.yymm !== 'all' && extractYYMM(x.serial) !== f.yymm) return false;
+    if(f.serial && !String(x.serial||'').toLowerCase().includes(f.serial.toLowerCase())) return false;
+    return true;
   });
   const tbody = document.getElementById('exchange-tbody');
   const cnt = document.getElementById('exchange-count');
@@ -2224,9 +2250,10 @@ function renderExchange() {
       : '';
   }
   const fex = window._excModelF === 'all' ? ex : ex.filter(x => _mKey(x.model) === window._excModelF);
-  if(cnt) cnt.textContent = ex.length ? `${fmt.num(fex.length)}건${window._excModelF!=='all' ? ` / 전체 ${fmt.num(ex.length)}건` : ''}` : '0건';
+  const _hasPeriodF = ex.length !== exAll.length;
+  if(cnt) cnt.textContent = `${fmt.num(fex.length)}건${(window._excModelF!=='all' && ex.length !== fex.length) ? ` / 조회 ${fmt.num(ex.length)}건` : ''}${_hasPeriodF ? ` / 전체 ${fmt.num(exAll.length)}건` : ''}`;
   if(!fex.length) {
-    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--text-3);padding:20px;">수리 불가 처리 내역이 없습니다.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--text-3);padding:20px;">${_hasPeriodF ? '조회 기간에 해당하는 수리 불가 처리 내역이 없습니다.' : '수리 불가 처리 내역이 없습니다.'}</td></tr>`;
     return;
   }
   const rows = fex.slice().sort((a,b) => new Date(b.date||0) - new Date(a.date||0));
