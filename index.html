@@ -647,6 +647,10 @@ table.data tr:hover td{background:var(--hover-bg,#fafbfc)}
         <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 3h5v5"/><path d="M8 21H3v-5"/><path d="M21 3 3 21"/><path d="M21 16v5h-5"/><path d="M3 8V3h5"/></svg>
         <span>수리 불가</span>
       </button>
+      <button class="sb-item" data-tab="t2n">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+        <span>T2N 품질</span>
+      </button>
       <button class="sb-item" data-tab="reentry">
         <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
         <span>재인입 추적</span>
@@ -773,6 +777,7 @@ table.data tr:hover td{background:var(--hover-bg,#fafbfc)}
         <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 3h5v5"/><path d="M8 21H3v-5"/><path d="M21 3 3 21"/><path d="M21 16v5h-5"/><path d="M3 8V3h5"/></svg>
         수리 불가
       </button>
+      <button class="tab" data-tab="t2n">📱 T2N 품질</button>
       <button class="tab" data-tab="reentry">🔁 재인입 추적</button>
       <button class="tab" data-tab="cost">
         <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
@@ -800,15 +805,6 @@ table.data tr:hover td{background:var(--hover-bg,#fafbfc)}
       <!-- KPI Cards -->
       <div class="kpi-grid" id="kpi-cards"></div>
 
-      <!-- ⭐ v2.75g: T2N 불량 분석 — 확인된 불량(재현 여부·유형)과 불량률 (작업자·상태·내부 메모 비노출) -->
-      <div class="card" id="t2n-quality-card" style="display:none;margin-bottom:16px;">
-        <div class="card-title">
-          <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12" y2="18.01"/></svg>
-          T2N 불량 분석
-          <span class="right" id="t2n-q-total"></span>
-        </div>
-        <div id="t2n-quality-body"></div>
-      </div>
 
       <!-- Row 1: 도넛 + 월별 콤보 -->
       <div class="grid-2">
@@ -1097,6 +1093,18 @@ table.data tr:hover td{background:var(--hover-bg,#fafbfc)}
     </div>
 
     <!-- ════════ Tab: Alerts ════════ -->
+    <!-- ════════ Tab: T2N 품질 (v2.75h — 대시보드 카드에서 정식 탭으로 승격) ════════ -->
+    <div class="tab-pane" id="pane-t2n" hidden>
+      <div class="card" id="t2n-quality-card" style="margin-bottom:16px;">
+        <div class="card-title">
+          <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12" y2="18.01"/></svg>
+          T2N 불량 분석
+          <span class="right" id="t2n-q-total"></span>
+        </div>
+        <div id="t2n-quality-body"></div>
+      </div>
+    </div>
+
     <div class="tab-pane" id="pane-alerts" hidden>
       <div class="filter-bar" style="margin-bottom:14px">
         <button class="chip active" data-alert="all">전체</button>
@@ -1670,12 +1678,21 @@ function _t2nRep(e) {
 }
 function renderT2NQuality() {
   const card = document.getElementById('t2n-quality-card');
-  if(!card) return;
+  const body = document.getElementById('t2n-quality-body');
+  if(!card || !body) return;
   const f = state.filter;
-  if(f.model !== 'all' && normalizeModel(f.model) !== 'T2N') { card.style.display = 'none'; return; }
+  // ⭐ v2.75h: 정식 탭 — 조건이 안 맞아도 숨기지 않고 이유를 안내
+  if(f.model !== 'all' && normalizeModel(f.model) !== 'T2N') {
+    const t = document.getElementById('t2n-q-total'); if(t) t.textContent = '';
+    body.innerHTML = '<div style="padding:24px;color:var(--muted,#94a3b8);font-size:13px;">상단 기종 필터가 T2N이 아니라 표시하지 않아요 — 기종 필터를 <b>전체</b> 또는 <b>T2N</b>으로 바꿔주세요.</div>';
+    return;
+  }
   const list = (state.filtered || []).filter(e => normalizeModel(e.model) === 'T2N');
-  if(!list.length) { card.style.display = 'none'; return; }
-  card.style.display = '';
+  if(!list.length) {
+    const t = document.getElementById('t2n-q-total'); if(t) t.textContent = '';
+    body.innerHTML = '<div style="padding:24px;color:var(--muted,#94a3b8);font-size:13px;">조회 조건(기간)에 해당하는 T2N AS 접수가 없습니다.</div>';
+    return;
+  }
   const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 
   const devices = new Set(list.map(e => e.serial));
@@ -2705,7 +2722,7 @@ function renderCost() {
 // ⭐ v2.75a: 기능 업데이트 소식 — 배포할 때 여기에 항목을 추가하면 알림 센터에 표시됩니다 (최신이 위).
 //   '정보' 분류라 미확인 뱃지(긴급·경고만 카운트)에는 영향 없음.
 const UPDATE_NOTES = [
-  { date: '2026-09-11', title: '📱 T2N 불량 분석 추가', msg: '대시보드에 T2N 불량 분석 카드가 추가되었습니다. 접수·기기 수, 불량 재현 여부와 확인 증상, 불량 유형 분포, 월별 추이를 볼 수 있고, T2N 총 납품 대수를 입력하면 접수율·확인 불량률이 계산됩니다.' },
+  { date: '2026-09-11', title: '📱 T2N 품질 탭 추가', msg: '좌측 메뉴에 T2N 품질 탭이 추가되었습니다. 접수·기기 수, 불량 재현 여부와 확인 증상, 불량 유형 분포, 월별 추이를 볼 수 있고, T2N 총 납품 대수를 입력하면 접수율·확인 불량률이 계산됩니다. 수리 불가 탭에서 엑셀 내보내기 시 해당 탭 데이터가 내보내집니다.' },
   { date: '2026-09-03', title: '🔧 수리 항목 추가', msg: '논배터리 작업(백커버 교체 포함)은 기존과 동일하게 "논배터리"로 표기되며, 커버를 재사용하는 "논배터리(백커버 미포함)"·백커버 단독 교체·배터리 교체·기타 작업 항목이 추가되었습니다.' },
   { date: '2026-08-27', title: '📦 출고 목록·엑셀 내보내기 개선', msg: '엑셀에 출고일자·재인입 회차 컬럼이 추가되고, 화면 출고 목록과 No·순서가 완전히 일치합니다. 출고 목록 조회 건수를 20개~전체 보기 중 선택할 수 있습니다.' },
   { date: '2026-08-27', title: '📱 T2N 기종 추가', msg: '신제품 T2N의 AS 현황이 대시보드에 포함됩니다. 상단 기종 필터에서 T2N을 선택해 조회할 수 있습니다.' },
@@ -2961,6 +2978,7 @@ function activateTab(name) {
   if(name === 'cost' && !state.charts.vendor) renderCost();
   if(name === 'parts') renderParts();
   if(name === 'unrepair') { try { renderExchange(); } catch(e) {} }
+  if(name === 't2n') { try { renderT2NQuality(); } catch(e) {} }   // ⭐ v2.75h: T2N 품질 탭
   if(name === 'reentry') { try { renderReentry(); } catch(e) {} }
   if(name === 'alerts') {
     // ⭐ 알림 확인 → 읽음 처리 (뱃지 제거)
