@@ -1802,6 +1802,17 @@ function renderT2NQuality() {
   body.innerHTML = h;
 }
 
+/* ═══════════════════════════════════════════════════════════════
+ *  RENDER: 대시보드 차트
+ * ═════════════════════════════════════════════════════════════ */
+// ⭐ v2.75i 핫픽스: T2N 탭 재작성 때 치환 범위 오류로 이 함수가 삭제되어
+//   대시보드가 "destroyChart is not defined"로 전체 로드 실패하던 문제 복구
+function destroyChart(key) {
+  const c = state.charts[key];
+  if(c && typeof c.destroy === 'function') c.destroy();
+  delete state.charts[key];
+}
+
 const CHART_COLORS = {
   blue:'#3b82f6', emerald:'#10b981', amber:'#f59e0b', purple:'#a855f7',
   rose:'#f43f5e', cyan:'#06b6d4',
