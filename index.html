@@ -649,7 +649,7 @@ table.data tr:hover td{background:var(--hover-bg,#fafbfc)}
       </button>
       <button class="sb-item" data-tab="t2n">
         <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
-        <span>T2N 품질</span>
+        <span>불량 분석</span>
       </button>
       <button class="sb-item" data-tab="reentry">
         <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
@@ -777,7 +777,7 @@ table.data tr:hover td{background:var(--hover-bg,#fafbfc)}
         <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 3h5v5"/><path d="M8 21H3v-5"/><path d="M21 3 3 21"/><path d="M21 16v5h-5"/><path d="M3 8V3h5"/></svg>
         수리 불가
       </button>
-      <button class="tab" data-tab="t2n">📱 T2N 품질</button>
+      <button class="tab" data-tab="t2n">📱 불량 분석</button>
       <button class="tab" data-tab="reentry">🔁 재인입 추적</button>
       <button class="tab" data-tab="cost">
         <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
@@ -1739,7 +1739,7 @@ function renderT2NQuality() {
     const w = works || [];
     const hw = Object.keys(T2N_DEF_MAP).filter(k => w.includes(k));
     if(hw.length) hw.forEach(k => { defCnt[T2N_DEF_MAP[k]] = (defCnt[T2N_DEF_MAP[k]] || 0) + 1; });
-    else if(repTag) defCnt['기타'] = (defCnt['기타'] || 0) + 1;
+    else if(repTag) defCnt['기타작업 (펌웨어 재설치 등)'] = (defCnt['기타작업 (펌웨어 재설치 등)'] || 0) + 1;
   };
   withRep.forEach(({ e, rep }) => { if(rep && rep.r === 'X') return; _addDef(e.works, rep && rep.r === 'O'); });
   exT2N.forEach(x => { let w = x.works; if(!Array.isArray(w)) { try { w = JSON.parse(w||'[]'); } catch(_) { w = []; } } _addDef(w, true); });
@@ -1761,7 +1761,7 @@ function renderT2NQuality() {
 
   let h = `<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;">
     ${chip('AS 접수', fmt.num(list.length) + '건')}
-    ${chip('불량 재현 O', fmt.num(repO.length) + '건', '#f43f5e')}
+    ${chip('불량 재현 O (교품 포함)', fmt.num(repO.length + exT2N.length) + '건', '#f43f5e')}
     ${chip('재현 안 됨', fmt.num(repX.length) + '건', '#10b981')}
     ${chip('수리 불가(교품)', fmt.num(exT2N.length) + '건', exT2N.length ? '#a855f7' : undefined)}
   </div>`;
@@ -1790,12 +1790,11 @@ function renderT2NQuality() {
   ].sort((a, b) => String(b.date).localeCompare(String(a.date))).slice(0, 50);
   h += `<div style="font-size:12.5px;font-weight:700;margin-bottom:8px;">접수 상세 <span style="font-size:10.5px;color:var(--muted,#94a3b8);font-weight:400;">· 최근 ${merged.length}건</span></div>
   <div style="overflow-x:auto;"><table class="data">
-    <thead><tr><th>접수일</th><th>시리얼</th><th>불량 재현</th><th>확인 증상</th><th>조치 (수리 항목)</th></tr></thead>
+    <thead><tr><th>진단일</th><th>시리얼</th><th>불량 재현 여부</th><th>조치 (수리 항목)</th></tr></thead>
     <tbody>${merged.map(r => `<tr>
       <td style="white-space:nowrap;">${String(r.date).slice(0, 10)}</td>
       <td style="font-family:monospace;font-size:11.5px;">${esc(r.serial)}</td>
       <td>${r.kind === 'exchange' ? '<span style="color:#a855f7;font-weight:700;">수리 불가</span>' : (r.rep ? (r.rep.r === 'O' ? '<span style="color:#f43f5e;font-weight:700;">재현 O</span>' : '<span style="color:#10b981;font-weight:700;">재현 안 됨</span>') : '<span style="color:var(--muted,#94a3b8);">-</span>')}</td>
-      <td>${r.kind === 'repair' && r.rep && r.rep.sym ? esc(r.rep.sym) : '<span style="color:var(--muted,#94a3b8);">-</span>'}</td>
       <td style="font-size:12px;">${(r.works || []).map(w => esc(workName(w))).join(', ') || '-'}${r.kind === 'exchange' ? ' <span style="font-size:10.5px;color:#a855f7;">→ 교품 처리</span>' : ''}</td>
     </tr>`).join('')}</tbody>
   </table></div>`;
