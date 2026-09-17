@@ -1810,9 +1810,11 @@ function _t2nRowHtml(r) {
   const repCell = (r.kind === 'exchange' || (r.rep && r.rep.r === 'O'))
     ? '<span style="color:#10b981;font-weight:700;">재현됨</span>'
     : (r.rep ? '<span style="color:#f43f5e;font-weight:700;">재현 안 됨</span>' : '<span style="color:var(--muted,#94a3b8);">-</span>');
+  // 수리 불가 건도 '어떤 작업이 필요했는지'를 먼저 보여주고 → 사유를 붙임
+  const wsTxt = (r.works || []).map(w => esc(workName(w))).join(', ');
   const actCell = r.kind === 'exchange'
-    ? '<span style="color:#a855f7;font-weight:700;">비용 초과로 인한 수리 불가</span> <span style="font-size:10.5px;color:var(--muted,#94a3b8);">(수리비 110,000원 이상)</span>'
-    : ((r.works || []).map(w => esc(workName(w))).join(', ') || '-');
+    ? `${wsTxt ? wsTxt + ' 필요 ' : ''}<span style="color:#a855f7;font-weight:700;">→ 비용 초과로 인한 수리 불가</span> <span style="font-size:10.5px;color:var(--muted,#94a3b8);">(수리비 110,000원 이상)</span>`
+    : (wsTxt || '-');
   return `<tr>
     <td style="white-space:nowrap;">${String(r.date).slice(0, 10)}</td>
     <td style="font-family:monospace;font-size:11.5px;">${esc(r.serial)}</td>
