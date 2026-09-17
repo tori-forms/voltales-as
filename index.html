@@ -1756,14 +1756,14 @@ function renderT2NQuality() {
   const tEl = document.getElementById('t2n-q-total');
   if(tEl) tEl.textContent = `AS 접수 ${fmt.num(list.length)}건 · 수리 불가 ${fmt.num(exT2N.length)}건 · 접수일 기준 (처리 중 포함)`;
   const chip = (label, val, color) => `<div style="padding:8px 14px;border-radius:10px;background:var(--surface2,rgba(148,163,184,.08));min-width:110px;">
-    <div style="font-size:11px;color:var(--muted,#94a3b8);">${label}</div>
+    <div style="font-size:11px;color:var(--muted,#94a3b8);white-space:nowrap;">${label}</div>
     <div style="font-size:17px;font-weight:800;color:${color || 'inherit'};">${val}</div></div>`;
 
   let h = `<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;">
     ${chip('AS 접수', fmt.num(list.length) + '건')}
-    ${chip('불량 재현 O (교품 포함)', fmt.num(repO.length + exT2N.length) + '건', '#f43f5e')}
+    ${chip('불량 재현 O (수리 불가 포함)', fmt.num(repO.length + exT2N.length) + '건', '#f43f5e')}
     ${chip('재현 안 됨', fmt.num(repX.length) + '건', '#10b981')}
-    ${chip('수리 불가(교품)', fmt.num(exT2N.length) + '건', exT2N.length ? '#a855f7' : undefined)}
+    ${chip('수리 불가 (비용 초과)', fmt.num(exT2N.length) + '건', exT2N.length ? '#a855f7' : undefined)}
   </div>`;
 
   h += `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px;margin-bottom:16px;">
@@ -1790,12 +1790,12 @@ function renderT2NQuality() {
   ].sort((a, b) => String(b.date).localeCompare(String(a.date))).slice(0, 50);
   h += `<div style="font-size:12.5px;font-weight:700;margin-bottom:8px;">접수 상세 <span style="font-size:10.5px;color:var(--muted,#94a3b8);font-weight:400;">· 최근 ${merged.length}건</span></div>
   <div style="overflow-x:auto;"><table class="data">
-    <thead><tr><th>진단일</th><th>시리얼</th><th>불량 재현 여부</th><th>조치 (수리 항목)</th></tr></thead>
+    <thead><tr><th style="white-space:nowrap;">진단일</th><th>시리얼</th><th style="white-space:nowrap;">불량 재현 여부</th><th>조치 (수리 항목)</th></tr></thead>
     <tbody>${merged.map(r => `<tr>
       <td style="white-space:nowrap;">${String(r.date).slice(0, 10)}</td>
       <td style="font-family:monospace;font-size:11.5px;">${esc(r.serial)}</td>
-      <td>${r.kind === 'exchange' ? '<span style="color:#a855f7;font-weight:700;">수리 불가</span>' : (r.rep ? (r.rep.r === 'O' ? '<span style="color:#f43f5e;font-weight:700;">재현 O</span>' : '<span style="color:#10b981;font-weight:700;">재현 안 됨</span>') : '<span style="color:var(--muted,#94a3b8);">-</span>')}</td>
-      <td style="font-size:12px;">${(r.works || []).map(w => esc(workName(w))).join(', ') || '-'}${r.kind === 'exchange' ? ' <span style="font-size:10.5px;color:#a855f7;">→ 교품 처리</span>' : ''}</td>
+      <td style="white-space:nowrap;">${r.kind === 'exchange' ? '<span style="color:#a855f7;font-weight:700;">수리 불가</span>' : (r.rep ? (r.rep.r === 'O' ? '<span style="color:#f43f5e;font-weight:700;">재현 O</span>' : '<span style="color:#10b981;font-weight:700;">재현 안 됨</span>') : '<span style="color:var(--muted,#94a3b8);">-</span>')}</td>
+      <td style="font-size:12px;">${(r.works || []).map(w => esc(workName(w))).join(', ') || '-'}${r.kind === 'exchange' ? ' <span style="font-size:10.5px;color:#a855f7;">→ 비용 초과 판정</span>' : ''}</td>
     </tr>`).join('')}</tbody>
   </table></div>`;
   body.innerHTML = h;
@@ -3055,7 +3055,7 @@ async function exportExchangeExcel() {
   if(_f.serial) _cond.push('시리얼 검색: ' + _f.serial);
   const today = new Date().toISOString().slice(0, 10);
   const aoa = [
-    ['수리 불가(교품) 처리 내역'],
+    ['수리 불가 처리 내역 (비용 초과)'],
     ['조회 조건: ' + _cond.join(' · ')],
     ['조회 ' + rows.length + '건' + (rows.length !== exAll.length ? ' / 전체 ' + exAll.length + '건' : '') + ' · 내보낸 날짜: ' + today],
     [],
