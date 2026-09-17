@@ -1019,7 +1019,7 @@ table.data tr:hover td{background:var(--hover-bg,#fafbfc)}
           <div class="cost-box">
             <div class="icon-line">📋 태클라스트 예상</div>
             <div class="v" id="ven-est">—</div>
-            <div class="sub">PCB 72,000 / LCD 65,000 / MB 23,000<br><span style="color:var(--text-3);font-size:11px;">+ 세척비 7,000 / S/W 설치 3,000원 (작업당)</span></div>
+            <div class="sub">PCB 72,000 / LCD 65,000 / MB 23,000<br><span style="color:var(--text-3);font-size:11px;">+ 세척비 7,000 / S/W 설치 3,000 / 필름 부착 5,000원 (건당)</span></div>
           </div>
           <div class="cost-box">
             <div class="icon-line">👤 폼즈 AS 비용</div>
@@ -2609,7 +2609,7 @@ function renderCost() {
 
   // ─── 비용 비교용 단가 (admin과 동일하게 하드코딩) ───
   const ps = (state.raw && state.raw.priceSettings) || {};
-  const TAECLAST = { pcb:72000, panel:65000, board:23000, wash:7000, sw:3000 };
+  const TAECLAST = { pcb:72000, panel:65000, board:23000, wash:7000, sw:3000, filmL:4000, filmB:1000 };   // ⭐ v2.75m: 필름 부착비 (액정 4,000 + 후면 1,000, 건당)
   const FORMS_LABOR = { pcb:15180, panel:10450, board:10450 };
   // ⭐ v2.75e: nonbat = 백커버 포함 18,700 (과거·현재 동일 단가라 시점 구분 불필요) / nonbat_nc = 미포함 10,800
   const NONBAT_PRICE_PER = Number(ps.nonbat) || 18700;
@@ -2619,6 +2619,14 @@ function renderCost() {
     if(ws.includes('nonbat') || ws.includes('nonbat_full')) return NONBAT_PRICE_PER;
     return NONBAT_NC_PER;
   };
+  // ⭐ v2.75m: 논배 부품도 작업 종류에 맞게 — 포함(백커버 부품 포함 단가) vs 커버X(nonbat_nc 단가)
+  const nbPartsOf = (e, mp) => {
+    const ws = e.works || [];
+    if(ws.includes('nonbat') || ws.includes('nonbat_full')) return Number(mp['nonbat']) || 0;
+    return Number(mp['nonbat_nc']) || Number(mp['nonbat']) || 0;
+  };
+  // ⭐ v2.75m: 필름(액정보호+후면보호) — 폼즈는 부착 공임 무상, 부품비만 1건 1회(_common)
+  const filmPartsOf = mp => Number(mp['_common']) || 0;
   const NEW_PRICE = Number(ps.newProduct) || NEW_UNIT_PRICE;
 
   // 1) 논배터리 AS 비용 vs 새제품 (논배터리 작업 entry만, 논배터리 공임+부품)
@@ -2626,15 +2634,15 @@ function renderCost() {
   const nonbatCount = nonbatData.length;
   const totalAS = nonbatData.reduce((s, e) => {
     const mp = modelPartsAll[normalizeModel(e.model)] || {};
-    const nbParts = Number(mp['nonbat']) || 0;
-    return s + nbLaborOf(e) + nbParts;
+    // 공임(백커버 포함/미포함 단가) + 부품(포함 건은 백커버 부품까지 든 단가) + 필름 부품(1건 1회, 부착 공임 무상)
+    return s + nbLaborOf(e) + nbPartsOf(e, mp) + filmPartsOf(mp);
   }, 0);
   const totalNew = nonbatCount * NEW_PRICE;
   const save = totalNew - totalAS;
   const savePct = totalNew > 0 ? (save/totalNew*100) : 0;
 
   document.getElementById('cost-as').innerHTML = fmt.num(totalAS) + '<span class="unit">원</span>';
-  document.getElementById('cost-as-sub').textContent = `${nonbatCount}건 수리 · 1건당 ${fmt.num(Math.round(totalAS/Math.max(nonbatCount,1)))}원`;
+  document.getElementById('cost-as-sub').textContent = `${nonbatCount}건 수리 · 1건당 ${fmt.num(Math.round(totalAS/Math.max(nonbatCount,1)))}원 · 백커버·필름 부품 포함`;
   document.getElementById('cost-new').innerHTML = fmt.num(totalNew) + '<span class="unit">원</span>';
   document.getElementById('cost-new-sub').textContent = `${nonbatCount}개 × ${fmt.num(NEW_PRICE)}원`;
   document.getElementById('cost-save').innerHTML = fmt.num(save) + '<span class="unit">원</span>';
@@ -2655,6 +2663,10 @@ function renderCost() {
     venCount++;
     const mp = modelPartsAll[normalizeModel(e.model)] || {};
     let taec = TAECLAST.wash + TAECLAST.sw; // 세척비 + S/W 설치비 (타사 작업 있는 건에만)
+    // ⭐ v2.75m: 필름 비교 — 태클라스트는 부착비 5,000원/건, 폼즈는 부품비만(공임 무상).
+    //   논배 작업이 있는 건은 논배 카드에서 이미 필름을 계상하므로 여기선 제외 (이중 계상 방지)
+    const hasNbWork = ws.has('nonbat') || ws.has('nonbat_nc') || ws.has('nonbat_full');
+    if(!hasNbWork) { taec += TAECLAST.filmL + TAECLAST.filmB; actualParts += filmPartsOf(mp); }
     if(ws.has('pcb'))   { taec += TAECLAST.pcb;   actualLabor += FORMS_LABOR.pcb;   actualParts += (Number(mp.pcb)||0); }
     if(ws.has('panel')) { taec += TAECLAST.panel; actualLabor += FORMS_LABOR.panel; actualParts += (Number(mp.panel)||0); }
     if(ws.has('board')) { taec += TAECLAST.board; actualLabor += FORMS_LABOR.board; actualParts += (Number(mp.board)||0); }
@@ -2681,7 +2693,7 @@ function renderCost() {
   document.getElementById('ven-count').textContent = venCount;
   document.getElementById('ven-est').innerHTML = fmt.num(estimated) + '<span class="unit">원</span>';
   document.getElementById('ven-actual').innerHTML = fmt.num(actual) + '<span class="unit">원</span>';
-  document.getElementById('ven-actual-sub').innerHTML = `PCB ${fmt.num(vAvg('PCB 교체'))} / LCD ${fmt.num(vAvg('LCD 교체'))} / MB ${fmt.num(vAvg('MB수리'))}<br><span style="color:var(--text-3);font-size:11px;">1건당 평균 (공임+부품)</span>`;
+  document.getElementById('ven-actual-sub').innerHTML = `PCB ${fmt.num(vAvg('PCB 교체'))} / LCD ${fmt.num(vAvg('LCD 교체'))} / MB ${fmt.num(vAvg('MB수리'))}<br><span style="color:var(--text-3);font-size:11px;">1건당 평균 (공임+부품) · 필름은 부품비만 (부착 공임 무상)</span>`;
   document.getElementById('ven-save').innerHTML = fmt.num(venSave) + '<span class="unit">원</span>';
   document.getElementById('ven-save-pct').textContent = venCount > 0 ? `${venSavePct.toFixed(0)}% 저렴 · 건당 ${fmt.num(Math.round(venSave/Math.max(venCount,1)))}원 절감` : '데이터 없음';
 
@@ -2719,7 +2731,7 @@ function renderCost() {
 
     // (1) 논배터리 절감: 새제품 가격 - (공임 + 부품비)   ⭐ v2.75e: 논배 계열 전부
     if(ws.has('nonbat') || ws.has('nonbat_nc') || ws.has('nonbat_full')) {
-      const nbCost = nbLaborOf(e) + (Number(mp.nonbat) || 0);
+      const nbCost = nbLaborOf(e) + nbPartsOf(e, mp) + filmPartsOf(mp);   // ⭐ v2.75m: 카드와 동일 기준
       monthly[ym].nonbat += (NEW_PRICE - nbCost);
     }
 
@@ -2728,6 +2740,8 @@ function renderCost() {
     if(hasComp) {
       let taec = TAECLAST.wash + TAECLAST.sw;
       let forms = 0;
+      const hasNbW = ws.has('nonbat') || ws.has('nonbat_nc') || ws.has('nonbat_full');
+      if(!hasNbW) { taec += TAECLAST.filmL + TAECLAST.filmB; forms += filmPartsOf(mp); }   // ⭐ v2.75m
       if(ws.has('pcb'))   { taec += TAECLAST.pcb;   forms += FORMS_LABOR.pcb   + (Number(mp.pcb)||0); }
       if(ws.has('panel')) { taec += TAECLAST.panel; forms += FORMS_LABOR.panel + (Number(mp.panel)||0); }
       if(ws.has('board')) { taec += TAECLAST.board; forms += FORMS_LABOR.board + (Number(mp.board)||0); }
