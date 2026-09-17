@@ -1784,21 +1784,59 @@ function renderT2NQuality() {
   </div>`;
 
   // 접수 상세 — 수리 접수 + 수리 불가(교품) 통합, 접수일 내림차순
+  // ⭐ v2.75l: 50건 제한 제거 — 전체 시리얼 표시 (수만 건 대비 200건 단위 페이지네이션)
   const merged = [
     ...withRep.map(({ e, rep }) => ({ date: e.date, serial: e.serial, rep, works: e.works || [], kind: 'repair' })),
     ...exT2N.map(x => { let w = x.works; if(!Array.isArray(w)) { try { w = JSON.parse(w||'[]'); } catch(_) { w = []; } } return { date: x.date, serial: x.serial, rep: null, works: w, kind: 'exchange' }; })
-  ].sort((a, b) => String(b.date).localeCompare(String(a.date))).slice(0, 50);
-  h += `<div style="font-size:12.5px;font-weight:700;margin-bottom:8px;">접수 상세 <span style="font-size:10.5px;color:var(--muted,#94a3b8);font-weight:400;">· 최근 ${merged.length}건</span></div>
+  ].sort((a, b) => String(b.date).localeCompare(String(a.date)));
+  window._t2nRows = merged;
+  window._t2nPage = 1;
+  h += `<div style="font-size:12.5px;font-weight:700;margin-bottom:8px;">접수 상세 <span id="t2n-detail-count" style="font-size:10.5px;color:var(--muted,#94a3b8);font-weight:400;"></span></div>
   <div style="overflow-x:auto;"><table class="data">
     <thead><tr><th style="white-space:nowrap;">진단일</th><th>시리얼</th><th style="white-space:nowrap;">불량 재현 여부</th><th>조치 (수리 항목)</th></tr></thead>
-    <tbody>${merged.map(r => `<tr>
-      <td style="white-space:nowrap;">${String(r.date).slice(0, 10)}</td>
-      <td style="font-family:monospace;font-size:11.5px;">${esc(r.serial)}</td>
-      <td style="white-space:nowrap;">${r.kind === 'exchange' ? '<span style="color:#a855f7;font-weight:700;">수리 불가</span>' : (r.rep ? (r.rep.r === 'O' ? '<span style="color:#f43f5e;font-weight:700;">재현 O</span>' : '<span style="color:#10b981;font-weight:700;">재현 안 됨</span>') : '<span style="color:var(--muted,#94a3b8);">-</span>')}</td>
-      <td style="font-size:12px;">${(r.works || []).map(w => esc(workName(w))).join(', ') || '-'}${r.kind === 'exchange' ? ' <span style="font-size:10.5px;color:#a855f7;">→ 비용 초과 판정</span>' : ''}</td>
-    </tr>`).join('')}</tbody>
-  </table></div>`;
+    <tbody id="t2n-detail-body"></tbody>
+  </table></div>
+  <div id="t2n-detail-pager" style="display:flex;align-items:center;justify-content:center;gap:8px;margin-top:12px;flex-wrap:wrap;"></div>`;
   body.innerHTML = h;
+  _t2nRenderRows();
+}
+
+/* ⭐ v2.75l: 접수 상세 페이지 렌더 — 전체 데이터를 들고 200건씩 표시 (수만 건에도 화면 안 무거움) */
+const _T2N_PAGE_SIZE = 200;
+function _t2nRowHtml(r) {
+  const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  return `<tr>
+    <td style="white-space:nowrap;">${String(r.date).slice(0, 10)}</td>
+    <td style="font-family:monospace;font-size:11.5px;">${esc(r.serial)}</td>
+    <td style="white-space:nowrap;">${r.kind === 'exchange' ? '<span style="color:#a855f7;font-weight:700;">수리 불가</span>' : (r.rep ? (r.rep.r === 'O' ? '<span style="color:#f43f5e;font-weight:700;">재현 O</span>' : '<span style="color:#10b981;font-weight:700;">재현 안 됨</span>') : '<span style="color:var(--muted,#94a3b8);">-</span>')}</td>
+    <td style="font-size:12px;">${(r.works || []).map(w => esc(workName(w))).join(', ') || '-'}${r.kind === 'exchange' ? ' <span style="font-size:10.5px;color:#a855f7;">→ 비용 초과 판정</span>' : ''}</td>
+  </tr>`;
+}
+function _t2nRenderRows() {
+  const rows = window._t2nRows || [];
+  const pages = Math.max(1, Math.ceil(rows.length / _T2N_PAGE_SIZE));
+  window._t2nPage = Math.min(Math.max(1, window._t2nPage || 1), pages);
+  const p = window._t2nPage;
+  const tb = document.getElementById('t2n-detail-body');
+  if(!tb) return;
+  tb.innerHTML = rows.length
+    ? rows.slice((p - 1) * _T2N_PAGE_SIZE, p * _T2N_PAGE_SIZE).map(_t2nRowHtml).join('')
+    : '<tr><td colspan="4" style="text-align:center;color:var(--muted,#94a3b8);padding:20px;">표시할 접수 내역이 없습니다.</td></tr>';
+  const cnt = document.getElementById('t2n-detail-count');
+  if(cnt) cnt.textContent = `· 전체 ${fmt.num(rows.length)}건` + (pages > 1 ? ` · ${(p - 1) * _T2N_PAGE_SIZE + 1}~${Math.min(p * _T2N_PAGE_SIZE, rows.length)}건 표시` : '');
+  const pg = document.getElementById('t2n-detail-pager');
+  if(pg) {
+    if(pages <= 1) { pg.innerHTML = ''; return; }
+    const btn = (label, target, disabled) => `<button onclick="_t2nSetPage(${target})" ${disabled ? 'disabled' : ''} style="padding:6px 12px;border-radius:8px;border:1px solid var(--line,#e2e8f0);background:var(--surface,transparent);color:inherit;font-size:12px;cursor:${disabled ? 'default' : 'pointer'};opacity:${disabled ? '.4' : '1'};">${label}</button>`;
+    pg.innerHTML = btn('« 처음', 1, p === 1) + btn('‹ 이전', p - 1, p === 1)
+      + `<span style="font-size:12px;color:var(--muted,#94a3b8);padding:0 6px;">${p} / ${fmt.num(pages)} 페이지</span>`
+      + btn('다음 ›', p + 1, p === pages) + btn('마지막 »', pages, p === pages);
+  }
+}
+function _t2nSetPage(p) {
+  window._t2nPage = p;
+  _t2nRenderRows();
+  try { document.getElementById('t2n-detail-count').scrollIntoView({ block: 'nearest' }); } catch(e) {}
 }
 
 /* ═══════════════════════════════════════════════════════════════
