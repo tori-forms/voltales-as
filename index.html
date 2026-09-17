@@ -1761,8 +1761,8 @@ function renderT2NQuality() {
 
   let h = `<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;">
     ${chip('AS 접수', fmt.num(list.length) + '건')}
-    ${chip('불량 재현 O (수리 불가 포함)', fmt.num(repO.length + exT2N.length) + '건', '#f43f5e')}
-    ${chip('재현 안 됨', fmt.num(repX.length) + '건', '#10b981')}
+    ${chip('재현됨 (수리 불가 포함)', fmt.num(repO.length + exT2N.length) + '건', '#10b981')}
+    ${chip('재현 안 됨', fmt.num(repX.length) + '건', '#f43f5e')}
     ${chip('수리 불가 (비용 초과)', fmt.num(exT2N.length) + '건', exT2N.length ? '#a855f7' : undefined)}
   </div>`;
 
@@ -1805,11 +1805,19 @@ function renderT2NQuality() {
 const _T2N_PAGE_SIZE = 200;
 function _t2nRowHtml(r) {
   const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  // ⭐ v2.75n: 재현 여부는 재현됨(초록)/재현 안 됨(빨강)만 — 수리 불가 건도 불량이 확인된 것이라 '재현됨'.
+  //   수리 불가 사유는 조치 컬럼에 명시.
+  const repCell = (r.kind === 'exchange' || (r.rep && r.rep.r === 'O'))
+    ? '<span style="color:#10b981;font-weight:700;">재현됨</span>'
+    : (r.rep ? '<span style="color:#f43f5e;font-weight:700;">재현 안 됨</span>' : '<span style="color:var(--muted,#94a3b8);">-</span>');
+  const actCell = r.kind === 'exchange'
+    ? '<span style="color:#a855f7;font-weight:700;">비용 초과로 인한 수리 불가</span> <span style="font-size:10.5px;color:var(--muted,#94a3b8);">(수리비 110,000원 이상)</span>'
+    : ((r.works || []).map(w => esc(workName(w))).join(', ') || '-');
   return `<tr>
     <td style="white-space:nowrap;">${String(r.date).slice(0, 10)}</td>
     <td style="font-family:monospace;font-size:11.5px;">${esc(r.serial)}</td>
-    <td style="white-space:nowrap;">${r.kind === 'exchange' ? '<span style="color:#a855f7;font-weight:700;">수리 불가</span>' : (r.rep ? (r.rep.r === 'O' ? '<span style="color:#f43f5e;font-weight:700;">재현 O</span>' : '<span style="color:#10b981;font-weight:700;">재현 안 됨</span>') : '<span style="color:var(--muted,#94a3b8);">-</span>')}</td>
-    <td style="font-size:12px;">${(r.works || []).map(w => esc(workName(w))).join(', ') || '-'}${r.kind === 'exchange' ? ' <span style="font-size:10.5px;color:#a855f7;">→ 비용 초과 판정</span>' : ''}</td>
+    <td style="white-space:nowrap;">${repCell}</td>
+    <td style="font-size:12px;">${actCell}</td>
   </tr>`;
 }
 function _t2nRenderRows() {
