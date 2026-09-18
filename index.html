@@ -1262,11 +1262,13 @@ const WORK_KO = {
   // ⭐ v2.75e: nonbat = 예나 지금이나 '논배터리(백커버 포함)' — 과거 데이터와 표기 일관.
   //   2026-09 단가 개편으로 신설된 '백커버 미포함(커버 재사용)'만 새 키 nonbat_nc.
   pcb:'PCB 교체', panel:'LCD 교체', board:'MB수리', nonbat:'논배터리',
-  nonbat_nc:'논배터리(백커버 미포함)', nonbat_full:'논배터리',
+  nonbat_nc:'파워보드 교체', nonbat_full:'논배터리',   // ⭐ v2.75o: 파워보드 교체로 명칭 변경 (구 '논배터리 백커버 미포함')
   battery:'배터리 교체', lcd:'LCD 교체', mb:'MB수리',
   cover:'백커버 교체', etc:'기타작업'   // ⭐ v2.75b: 백커버(신설)·기타 작업 표기
 };
 function workName(k) { return WORK_KO[k] || k; }
+// ⭐ v2.75o: 과거 출고 로그에 문자열로 저장된 구 명칭 표기 교정
+function fixWorkStr(x) { return String(x || '').replace(/논배터리\(커버X\)/g, '파워보드').replace(/논배\(미포함\)/g, '파워보드').replace(/논배터리\(백커버 미포함\)/g, '파워보드 교체'); }
 
 /* Toast */
 function toast(msg, kind='') {
@@ -2262,7 +2264,7 @@ function computeShipRows() {
       no: idx+1,
       serial: s.serial,
       model: s.model || (e?.model || '-'),
-      works: s.works || ((e?.works||[]).map(workName).join(' / ')),
+      works: s.works ? fixWorkStr(s.works) : ((e?.works||[]).map(workName).join(' / ')),
       shipDate: s.shipDate || '-',
       shipDay: dayKey(s.shipDate),   // ⭐ v2.74: 엑셀용 YYYY-MM-DD
       visit: visitOf(e),             // ⭐ v2.75: 재인입 회차
@@ -2560,7 +2562,7 @@ function _peRows() {
         serial: sh.serial || '-',
         model: (e && e.model) || sh.model || '-',
         shipDate: sh.shipDate || '',
-        works: e ? (e.works||[]).map(w=>workName(w)).join(', ') : (sh.works || '-'),
+        works: e ? (e.works||[]).map(w=>workName(w)).join(', ') : (fixWorkStr(sh.works) || '-'),
         parts: [...new Set(parts)]
       };
     })
