@@ -285,7 +285,11 @@ canvas,img{max-width:100%}
   border-bottom:1px solid var(--border);
   margin-bottom:18px;
   padding-bottom:0;
+  /* ⭐ v2.75p: 좁은 화면(노트북 배율 125~150%)에서 탭 글자가 두 줄로 꺾이던 것 →
+     한 줄 유지 + 넘치면 가로 스크롤 (스크롤바는 숨김) */
+  overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;
 }
+.tabs::-webkit-scrollbar{display:none;}
 .tab{
   padding:10px 14px 11px;
   font-size:13.5px;font-weight:500;
@@ -294,6 +298,7 @@ canvas,img{max-width:100%}
   border-bottom:2px solid transparent;
   transition:color .12s,border-color .12s;
   margin-bottom:-1px;
+  white-space:nowrap;flex-shrink:0;
 }
 .tab:hover{color:var(--text)}
 .tab.active{color:var(--primary);border-bottom-color:var(--primary);font-weight:600}
