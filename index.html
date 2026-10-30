@@ -3415,26 +3415,59 @@ function refresh() {
   if(activeTab === 'alerts') renderAlerts();
 }
 
+// ⭐ v2.72: 출고 이중 기록 방어 — 같은 시리얼+같은 날짜 중복 행은 첫 행만 사용
+function _dedupShip(raw) {
+  if(Array.isArray(raw.shipLog)) {
+    const _sdSeen = new Set();
+    raw.shipLog = raw.shipLog.filter(s => {
+      const d = new Date(s.shipDate);
+      const dk = isNaN(d) ? String(s.shipDate || '') : d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+      const k = String(s.serial || '') + '|' + dk;
+      if(_sdSeen.has(k)) return false;
+      _sdSeen.add(k);
+      return true;
+    });
+  }
+  return raw;
+}
+function _showLastUpdate() {
+  const now = new Date();
+  document.getElementById('last-update').textContent =
+    `${now.getFullYear()}. ${now.getMonth()+1}. ${now.getDate()}. ${now.getHours()<12?'오전':'오후'} ${(now.getHours()%12||12)}:${String(now.getMinutes()).padStart(2,'0')}`;
+}
+
+// ⭐ v2.76: 자동 갱신 — 예전엔 페이지를 연 시점 데이터에 멈춰 있어, 출고 처리 후에도 새로고침 전까지 옛 숫자가 보였음.
+//   5분마다·탭 복귀 시 다시 받고, 데이터가 바뀐 경우에만 다시 그린다 (보던 출고 목록 페이지는 유지).
+let _lastRawSig = '', _lastLoadAt = Date.now(), _autoBusy = false;
+async function autoReload() {
+  if(DEMO_MODE || _autoBusy || !_lastRawSig || document.visibilityState === 'hidden') return;   // 첫 로드 실패 화면에선 안 돎
+  _autoBusy = true;
+  try {
+    const raw = _dedupShip(await loadData());
+    _lastLoadAt = Date.now();
+    _showLastUpdate();
+    const sig = JSON.stringify(raw);
+    if(sig === _lastRawSig) return;
+    _lastRawSig = sig;
+    state.raw = raw;
+    populateYearOptions();
+    const page = state.shippingPage;
+    refresh();
+    if(page > 1 && document.querySelector('.tab.active')?.dataset.tab === 'shipping') { state.shippingPage = page; renderShipping(); }
+  } catch(e) { console.warn('[자동 갱신 실패 — 다음 주기에 재시도]', e); }
+  finally { _autoBusy = false; }
+}
+setInterval(autoReload, 5 * 60000);
+document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'visible' && Date.now() - _lastLoadAt > 2 * 60000) autoReload(); });
+
 async function init() {
   updateThemeButton(); // 저장된 테마에 따라 버튼 라벨/아이콘 초기화
   document.getElementById('loading').style.display = 'flex';
   document.querySelectorAll('.tab-pane').forEach(p => p.hidden = true);
 
   try {
-    state.raw = await loadData();
-
-    // ⭐ v2.72: 출고 이중 기록 방어 — 같은 시리얼+같은 날짜 중복 행은 첫 행만 사용
-    if(Array.isArray(state.raw.shipLog)) {
-      const _sdSeen = new Set();
-      state.raw.shipLog = state.raw.shipLog.filter(s => {
-        const d = new Date(s.shipDate);
-        const dk = isNaN(d) ? String(s.shipDate || '') : d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
-        const k = String(s.serial || '') + '|' + dk;
-        if(_sdSeen.has(k)) return false;
-        _sdSeen.add(k);
-        return true;
-      });
-    }
+    state.raw = _dedupShip(await loadData());
+    _lastRawSig = JSON.stringify(state.raw);
 
     // ⭐ 출고연도 드롭다운 채우기 (출고이력의 연도 추출)
     populateYearOptions();
@@ -3469,10 +3502,7 @@ async function init() {
     console.log('═══════════════════════════════════════════════');
     // ════ 디버그 로그 끝 ════
 
-    // 업데이트 시간 표시
-    const now = new Date();
-    document.getElementById('last-update').textContent =
-      `${now.getFullYear()}. ${now.getMonth()+1}. ${now.getDate()}. ${now.getHours()<12?'오전':'오후'} ${(now.getHours()%12||12)}:${String(now.getMinutes()).padStart(2,'0')}`;
+    _showLastUpdate();
 
     initFilters();
     bindEvents();
