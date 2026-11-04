@@ -963,7 +963,7 @@ table.data tr:hover td{background:var(--hover-bg,#fafbfc)}
         </div>
         <div style="padding:0 16px 4px;font-size:11.5px;color:var(--text-3);line-height:1.6;">
           💡 출고 후 다시 전달된 기기를 <b>시리얼별로 묶어</b> 회차·사유와 함께 추적합니다 —
-          <b style="color:#ef4444;">반복 수리</b>(직전에 고친 부품·작업이 다시 고장 · 증상 달라도 포함) · <b style="color:#8b5cf6;">다른 부위 고장</b>(직전 수리와 무관한 곳) · <b style="color:#d97706;">고객 과실</b>(파손·침수 등 · 같은 부위라도) · <b style="color:#2563eb;">단순 작업 요청</b>(펌웨어/점검 등)
+          <b style="color:#ef4444;">반복 수리</b>(직전에 수리한 항목만 다시 수리) · <b style="color:#8b5cf6;">다른 부위 고장</b>(직전에 없던 항목 수리 · 함께 수리 포함) · <b style="color:#d97706;">고객 과실</b>(파손·침수 등 · 같은 부위라도)
         </div>
         <div id="reentry-body" style="padding:8px 16px 16px;"></div>
       </div>
@@ -1635,8 +1635,8 @@ function renderKPI() {
   //   매장 과실(store)·단순 작업(task)은 재발률에서 제외하고 별도 집계 (foot에 표기)
   const _parseRe = (e) => { try { const r = JSON.parse(e.reentry || ''); return (r && r.v >= 2) ? r : null; } catch(_) { return null; } };
   const reentries = data.map(_parseRe).filter(Boolean);
-  const _reCnt = { defect:0, store:0, task:0, etc:0 };
-  reentries.forEach(r => { _reCnt[r.rs] = (_reCnt[r.rs] || 0) + 1; });
+  const _reCnt = { defect:0, newdefect:0, store:0 };
+  data.forEach(e => { const r = _parseRe(e); if(r) { const k = _reClassRs(r, e); _reCnt[k] = (_reCnt[k] || 0) + 1; } });   // v2.78: 재인입 탭과 같은 판정
   const shippedCnt = data.filter(e => String(e.status) === 'shipped').length;
   const repeats = reentries.length;   // 재입고(재인입) 총 건수
   const repeatPct = shippedCnt ? (_reCnt.defect / shippedCnt * 100) : 0;
@@ -2977,10 +2977,28 @@ const RE_REASONS = {
   etc:    { label: '기타',           color: '#64748b', bg: '#f8fafc' }
 };
 // ⭐ v2.70v: 구형 '기타' 기록 중 메모가 '추가 발견/타 불량' 계열이면 표시상 타 불량 발생으로 재분류
-function _reClassRs(r) {
+// v2.78: 고객 과실만 엔지니어 선택을 따르고, 나머지는 작업 내역으로 판정한다.
+//   이번 작업(기타작업 제외)이 전부 직전 수리 항목이면 반복 수리, 아니면 다른 부위 고장. 저장된 원본은 그대로.
+function _reWorkKey(w) { return w === 'nonbat_full' ? 'nonbat' : w; }
+function _rePrevEntry(r, e) {
+  const all = (state.raw && state.raw.entries) || [];
+  if(r.prev) { const p = all.find(x => String(x.id) === String(r.prev)); if(p) return p; }
+  const t = new Date(e.date).getTime();
+  return all.filter(x => x.serial === e.serial && new Date(x.date).getTime() < t)
+            .sort((a, b) => new Date(b.date) - new Date(a.date))[0] || null;
+}
+function _reClassRs(r, e) {
   if(!r) return 'etc';
-  if(r.rs === 'etc' && /추가 발견|추가 발생|다른 불량|타 불량|새 증상|새로운 불량|추가로 발견/.test(String(r.memo || ''))) return 'newdefect';
-  return r.rs;
+  if(r.rs === 'store') return 'store';
+  const prev = e ? _rePrevEntry(r, e) : null;
+  if(prev) {
+    const pw = new Set((prev.works || []).map(_reWorkKey));
+    const cur = (e.works || []).map(_reWorkKey).filter(w => w !== 'etc');
+    return (cur.length && cur.every(w => pw.has(w))) ? 'defect' : 'newdefect';
+  }
+  // 직전 기록을 못 찾으면 예전 방식(단순 작업 요청은 재인입에 쓰지 않으므로 다른 부위 고장으로)
+  if(r.rs === 'defect') return 'defect';
+  return 'newdefect';
 }
 function _reParse(e) {
   try { const r = JSON.parse(e.reentry || ''); return (r && r.v >= 2) ? r : null; } catch(_) { return null; }
@@ -3011,8 +3029,8 @@ function renderReentry() {
     })
     .sort((a, b) => new Date(b.lastReDate) - new Date(a.lastReDate));
 
-  const cnt = { defect: 0, newdefect: 0, store: 0, task: 0, etc: 0 };
-  reEntries.forEach(e => { const r = _reParse(e); const k = _reClassRs(r); cnt[k] = (cnt[k] || 0) + 1; });
+  const cnt = { defect: 0, newdefect: 0, store: 0 };
+  reEntries.forEach(e => { const r = _reParse(e); const k = _reClassRs(r, e); cnt[k] = (cnt[k] || 0) + 1; });
   const tot = reEntries.length;
   const _center = 'display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;';
   const kpiCard = (k) => {
@@ -3024,8 +3042,8 @@ function renderReentry() {
       <div class="kpi-foot">재인입의 ${pct}%</div>
     </div>`;
   };
-  kpiEl.style.gridTemplateColumns = 'repeat(6, 1fr)';   // ⭐ v2.70y: 기타 카드 포함 6장 — 어느 분류도 숨지 않게
-  kpiEl.innerHTML = ['defect', 'newdefect', 'store', 'task', 'etc'].map(kpiCard).join('') + `
+  kpiEl.style.gridTemplateColumns = 'repeat(4, 1fr)';   // v2.78: 재인입은 반복/다른 부위/고객 과실 세 가지로만 판정
+  kpiEl.innerHTML = ['defect', 'newdefect', 'store'].map(kpiCard).join('') + `
     <div class="kpi" style="${_center}">
       <div class="kpi-label">재인입 총계</div>
       <div class="kpi-value">${tot}<span class="unit">건</span></div>
@@ -3044,8 +3062,8 @@ function renderReentry() {
       return `<div style="display:flex;align-items:center;gap:8px;padding:4px 0;flex-wrap:wrap;">
         <span style="font-size:11px;font-weight:800;color:var(--text-3);min-width:34px;">${i + 1}차</span>
         <span style="font-size:11.5px;font-family:monospace;color:var(--text-2);min-width:82px;">${d}</span>
-        ${x.r ? _reTag(_reClassRs(x.r), true) : '<span style="font-size:10.5px;color:var(--text-3);">최초 수리</span>'}
-        ${x.r && x.r.memo ? `<span style="font-size:11px;color:var(--text-3);">— ${x.r.memo}</span>` : ''}
+        ${x.r ? _reTag(_reClassRs(x.r, x.e), true) : '<span style="font-size:10.5px;color:var(--text-3);">최초 수리</span>'}
+        ${(x.e.works || []).length ? `<span style="font-size:11.5px;color:var(--text-1);">${x.e.works.map(workName).join(' / ')}</span>` : ''}
       </div>`;
     }).join('');
     return `<div style="border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:10px;">
