@@ -2212,8 +2212,9 @@ function renderWorktype() {
     type:'doughnut',
     data:{
       labels:[
-        `단일수리 ${fmt.num(single.length)}건 · 금액 ${fmt.pct(sumS, sumS + sumM)}`,
-        `복합수리 ${fmt.num(multi.length)}건 · 금액 ${fmt.pct(sumM, sumS + sumM)}`,
+        // v2.83: 조각 크기 = 비용 비중. %를 앞에 두고 건수·금액은 괄호로 (건수 %로 오해 방지)
+        `단일수리 ${fmt.pct(sumS, sumS + sumM)} (${fmt.num(single.length)}건 · ${fmt.num(sumS)}원)`,
+        `복합수리 ${fmt.pct(sumM, sumS + sumM)} (${fmt.num(multi.length)}건 · ${fmt.num(sumM)}원)`,
       ],
       datasets:[{ data:[sumS, sumM], backgroundColor:['#10b981','#f59e0b'], borderWidth:0 }],
     },
