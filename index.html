@@ -2120,11 +2120,13 @@ function renderQuarter() {
     const q = m<=3?'Q1':m<=6?'Q2':m<=9?'Q3':'Q4';
     if(buckets[q] !== undefined) buckets[q]++;
   });
+  const qTotal = buckets.Q1 + buckets.Q2 + buckets.Q3 + buckets.Q4;
   destroyChart('quarter');
   state.charts.quarter = new Chart(document.getElementById('chart-quarter'), {
     type:'bar',
     data:{
-      labels:['Q1','Q2','Q3','Q4'],
+      // 좁은 화면은 축 글자가 막대 자리를 먹으므로 비율만
+      labels:['Q1','Q2','Q3','Q4'].map(q => innerWidth <= 640 ? `${q} ${fmt.pct(buckets[q], qTotal)}` : `${q}  ${fmt.num(buckets[q])}건 (${fmt.pct(buckets[q], qTotal)})`),
       datasets:[{
         data:[buckets.Q1, buckets.Q2, buckets.Q3, buckets.Q4],
         backgroundColor:['#60a5fa','#fbbf24','#f97316','#a855f7'],
@@ -2153,7 +2155,10 @@ function renderWorktype() {
   state.charts.worktype = new Chart(document.getElementById('chart-worktype'), {
     type:'doughnut',
     data:{
-      labels:['단일수리','복합수리'],
+      labels:[
+        `단일수리 ${fmt.num(single.length)}건 · 금액 ${fmt.pct(sumS, sumS + sumM)}`,
+        `복합수리 ${fmt.num(multi.length)}건 · 금액 ${fmt.pct(sumM, sumS + sumM)}`,
+      ],
       datasets:[{ data:[sumS, sumM], backgroundColor:['#10b981','#f59e0b'], borderWidth:0 }],
     },
     options:{
@@ -2181,6 +2186,7 @@ function renderHeatmap() {
   const dayNames = ['','월','화','수','목','금','토'];
   const allVals = Object.values(grid).flatMap(v => Object.values(v));
   const max = Math.max(...allVals, 1);
+  const hTotal = allVals.reduce((s, v) => s + v, 0);
 
   const lerp = (a,b,t) => Math.round(a + (b-a)*t);
   const cellColor = (intensity) => {
@@ -2201,7 +2207,7 @@ function renderHeatmap() {
         const intensity = v / max;
         const bg = cellColor(intensity);
         const txt = intensity > 0.45 ? '#ffffff' : '#1e3a8a';
-        html += `<div class="h-cell" style="background:${bg};color:${txt};text-shadow:${intensity>0.45?'0 1px 2px rgba(0,0,0,.3)':'none'};">${v}</div>`;
+        html += `<div class="h-cell" style="background:${bg};color:${txt};text-shadow:${intensity>0.45?'0 1px 2px rgba(0,0,0,.3)':'none'};flex-direction:column;line-height:1.15;">${v}<span style="font-size:10px;font-weight:600;opacity:.8;">${fmt.pct(v, hTotal)}</span></div>`;
       }
     }
   }
