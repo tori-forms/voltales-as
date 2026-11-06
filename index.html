@@ -651,11 +651,11 @@ table.data tr:hover td{background:var(--hover-bg,#fafbfc)}
       </button>
       <button class="sb-item" data-tab="fwreq">
         <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 9h6v6H9z"/><path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 14h3M1 9h3M1 14h3"/></svg>
-        <span>FW 설치 요청</span> <span class="badge" data-fwcnt="fwreq" style="background:var(--text-3)"></span>
+        <span>외부 작업 요청</span> <span class="badge" data-fwcnt="fwreq" style="background:var(--text-3)"></span>
       </button>
       <button class="sb-item" data-tab="fwship">
         <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 9h6v6H9z"/><path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 14h3M1 9h3M1 14h3"/></svg>
-        <span>FW 설치 출고</span>
+        <span>외부 작업 출고</span>
       </button>
       <button class="sb-item" data-tab="unrepair">
         <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 3h5v5"/><path d="M8 21H3v-5"/><path d="M21 3 3 21"/><path d="M21 16v5h-5"/><path d="M3 8V3h5"/></svg>
@@ -787,8 +787,8 @@ table.data tr:hover td{background:var(--hover-bg,#fafbfc)}
         <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"/><path d="M15 18H9"/><path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.624l-3.48-4.35A1 1 0 0 0 17.52 8H14"/><circle cx="17" cy="18" r="2"/><circle cx="7" cy="18" r="2"/></svg>
         출고 목록
       </button>
-      <button class="tab" data-tab="fwreq"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 9h6v6H9z"/><path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 14h3M1 9h3M1 14h3"/></svg> FW 설치 요청 <span class="badge" data-fwcnt="fwreq" style="background:var(--text-3)"></span></button>
-      <button class="tab" data-tab="fwship"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 9h6v6H9z"/><path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 14h3M1 9h3M1 14h3"/></svg> FW 설치 출고</button>
+      <button class="tab" data-tab="fwreq"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 9h6v6H9z"/><path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 14h3M1 9h3M1 14h3"/></svg> 외부 작업 요청 <span class="badge" data-fwcnt="fwreq" style="background:var(--text-3)"></span></button>
+      <button class="tab" data-tab="fwship"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 9h6v6H9z"/><path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 14h3M1 9h3M1 14h3"/></svg> 외부 작업 출고</button>
       <button class="tab" data-tab="unrepair">
         <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 3h5v5"/><path d="M8 21H3v-5"/><path d="M21 3 3 21"/><path d="M21 16v5h-5"/><path d="M3 8V3h5"/></svg>
         수리 불가
@@ -963,11 +963,11 @@ table.data tr:hover td{background:var(--hover-bg,#fafbfc)}
 
     </div>
 
-    <!-- ════════ Tab: FW 설치 요청 (v2.82) ════════ -->
+    <!-- ════════ Tab: 외부 작업 요청 (v2.82) ════════ -->
     <div class="tab-pane" id="pane-fwreq" hidden>
       <div class="grid-4" id="fwreq-kpi"></div>
       <div class="card">
-        <div class="card-title">FW 설치 요청 (펌웨어·시리얼 작업)</div>
+        <div class="card-title">외부 작업 요청 (펌웨어·시리얼 작업)</div>
         <div class="table-wrap">
           <table class="data" id="fwreq-table">
             <thead><tr><th>묶음</th><th>기종</th><th>작업</th><th>입고일</th><th style="text-align:right">대수</th><th>상태</th></tr></thead>
@@ -977,11 +977,11 @@ table.data tr:hover td{background:var(--hover-bg,#fafbfc)}
       </div>
     </div>
 
-    <!-- ════════ Tab: FW 설치 출고 (v2.82) ════════ -->
+    <!-- ════════ Tab: 외부 작업 출고 (v2.82) ════════ -->
     <div class="tab-pane" id="pane-fwship" hidden>
       <div class="grid-4" id="fwship-kpi"></div>
       <div class="card">
-        <div class="card-title">FW 설치 출고 (펌웨어·시리얼 작업)</div>
+        <div class="card-title">외부 작업 출고 (펌웨어·시리얼 작업)</div>
         <div class="table-wrap">
           <table class="data" id="fwship-table">
             <thead><tr><th>묶음</th><th>기종</th><th>작업</th><th>입고일</th><th>출고일</th><th style="text-align:right">대수</th><th style="text-align:right">금액</th></tr></thead>
@@ -1205,7 +1205,7 @@ const state = {
   alerts: [],
   alertFilter: 'all',
   shippingPage: 1,
-  filteredSpecial: [], // FW 설치 요청 건(필터 적용)
+  filteredSpecial: [], // 외부 작업 요청 건(필터 적용)
   spOpen: {},
   shippingPageSize: 20,
 };
@@ -1643,7 +1643,7 @@ function applyFilter() {
     return db.localeCompare(da);
   });
 
-  // FW 설치 요청(펌웨어·시리얼 작업): 출고완료는 출고일, 그 외는 입고일 기준으로 같은 기간·분기·기종·시리얼 필터 적용
+  // 외부 작업 요청(펌웨어·시리얼 작업): 출고완료는 출고일, 그 외는 입고일 기준으로 같은 기간·분기·기종·시리얼 필터 적용
   state.filteredSpecial = specialReqRows().filter(r => {
     const dv = r.status === 'shipped' ? r.shipDate : r.inAt;
     if(!checkQuarter(dv)) return false;
@@ -2441,7 +2441,7 @@ function renderShipping() {
   renderSpecial();
 }
 
-/* ═══ FW 설치 출고 (티오더 펌웨어·시리얼 작업, 건당 2,500원) ═══ */
+/* ═══ 외부 작업 출고 (티오더 펌웨어·시리얼 작업, 건당 2,500원) ═══ */
 function specialReqRows() {
   let t = state.raw && state.raw.specialReqs;
   if(t && t._t === 'tbl') t = (t.rows || []).map(r => Object.fromEntries(t.cols.map((c, i) => [c, r[i]])));
@@ -2462,7 +2462,7 @@ function _spBatches(rows) {
       amount: l.filter(r => r.status === 'shipped').reduce((s, r) => s + Number(r.price || 0), 0)};
   }).sort((a, b) => b.inAt.localeCompare(a.inAt));
 }
-// ⭐ v2.82: 좌측 메뉴 'FW 설치 요청'(미출고: 작업 중·출고대기) / 'FW 설치 출고'(출고완료) 두 탭으로 분리 (티오더 요청)
+// ⭐ v2.82: 좌측 메뉴 '외부 작업 요청'(미출고: 작업 중·출고대기) / '외부 작업 출고'(출고완료) 두 탭으로 분리 (티오더 요청)
 const fwRows = tab => (state.filteredSpecial || []).filter(r => (r.status === 'shipped') === (tab === 'fwship'));
 function toggleSpBatch(tab, i) { const b = state.spB[tab][i].batch, k = tab + '|' + b; state.spOpen[k] = !state.spOpen[k]; renderSpecial(); }
 function renderSpecial() {
@@ -2487,11 +2487,11 @@ function renderSpecial() {
       if(!open) return main;
       const ser = b.l.map(r => `<tr><td style="font-family:monospace;font-size:12.5px">${_escP(r.serial)}</td><td>${ship ? _spD(r.shipDate) || '-' : _spSt[r.status] || r.status}</td></tr>`).join('');
       return main + `<tr><td colspan="${cols}" style="padding:0 16px 12px;background:var(--hover-bg,#fafbfc)"><div style="max-height:320px;overflow:auto"><table class="data"><thead><tr><th>시리얼번호</th><th>${ship ? '출고일' : '상태'}</th></tr></thead><tbody>${ser}</tbody></table></div></td></tr>`;
-    }).join('') || `<tr><td colspan="${cols}"><div class="empty">${ship ? 'FW 설치 출고 건이 없습니다' : '작업 대기 중인 FW 설치 요청이 없습니다'}</div></td></tr>`;
+    }).join('') || `<tr><td colspan="${cols}"><div class="empty">${ship ? '외부 작업 출고 건이 없습니다' : '작업 대기 중인 외부 작업 요청이 없습니다'}</div></td></tr>`;
   });
 }
 async function exportSpecialExcel(tab) {
-  const rows = fwRows(tab), name = tab === 'fwship' ? 'FW설치출고' : 'FW설치요청';
+  const rows = fwRows(tab), name = tab === 'fwship' ? '외부작업출고' : '외부작업요청';
   if(!rows.length) { toast('내보낼 데이터가 없습니다','error'); return; }
   try { if(typeof XLSX === 'undefined') { toast('엑셀 라이브러리 로딩 중...','info'); await waitForXLSX(10); } }
   catch(err) { toast('엑셀 라이브러리 로드 실패. 페이지 새로고침 후 다시 시도해주세요.','error'); return; }
@@ -3563,7 +3563,7 @@ function refresh() {
   const activeTab = document.querySelector('.tab.active')?.dataset.tab;
   if(activeTab === 'analysis') { renderQuarter(); renderWorktype(); renderHeatmap(); }
   if(activeTab === 'shipping') renderShipping();
-  renderSpecial();   // v2.82: 좌측 FW 설치 요청 대수 배지도 함께 갱신
+  renderSpecial();   // v2.82: 좌측 외부 작업 요청 대수 배지도 함께 갱신
   if(activeTab === 'cost') renderCost();
   if(activeTab === 'parts') renderParts();
   if(activeTab === 'unrepair') { try { renderExchange(); } catch(e) {} }
