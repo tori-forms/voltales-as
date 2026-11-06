@@ -916,7 +916,7 @@ table.data tr:hover td{background:var(--hover-bg,#fafbfc)}
     <div class="tab-pane" id="pane-shipping" hidden>
       <div class="seg" id="ship-view-seg" style="margin-bottom:12px;">
         <button class="seg-btn active" data-shipview="as" onclick="setShipView('as')">AS 수리 출고 <b id="ship-cnt-as">0</b></button>
-        <button class="seg-btn" data-shipview="sp" onclick="setShipView('sp')">별도 요청 출고 <b id="ship-cnt-sp">0</b></button>
+        <button class="seg-btn" data-shipview="sp" onclick="setShipView('sp')">FW 설치 출고 <b id="ship-cnt-sp">0</b></button>
       </div>
       <div id="ship-as">
       <div class="grid-4" id="ship-kpi"></div>
@@ -959,7 +959,7 @@ table.data tr:hover td{background:var(--hover-bg,#fafbfc)}
       <div id="ship-sp" hidden>
         <div class="grid-4" id="sp-kpi" style="grid-template-columns:repeat(5,1fr)"></div>
         <div class="card">
-          <div class="card-title">별도 요청 출고 (펌웨어·시리얼 작업)</div>
+          <div class="card-title">FW 설치 출고 (펌웨어·시리얼 작업)</div>
           <div class="table-wrap">
             <table class="data" id="sp-table">
               <thead><tr>
@@ -1189,7 +1189,7 @@ const state = {
   alertFilter: 'all',
   shippingPage: 1,
   shipView: 'as',
-  filteredSpecial: [], // 별도 요청 건(필터 적용)
+  filteredSpecial: [], // FW 설치 요청 건(필터 적용)
   spOpen: {},
   shippingPageSize: 20,
 };
@@ -1627,7 +1627,7 @@ function applyFilter() {
     return db.localeCompare(da);
   });
 
-  // 별도 요청(펌웨어·시리얼 작업): 출고완료는 출고일, 그 외는 입고일 기준으로 같은 기간·분기·기종·시리얼 필터 적용
+  // FW 설치 요청(펌웨어·시리얼 작업): 출고완료는 출고일, 그 외는 입고일 기준으로 같은 기간·분기·기종·시리얼 필터 적용
   state.filteredSpecial = specialReqRows().filter(r => {
     const dv = r.status === 'shipped' ? r.shipDate : r.inAt;
     if(!checkQuarter(dv)) return false;
@@ -2424,7 +2424,7 @@ function renderShipping() {
   renderSpecial();
 }
 
-/* ═══ 별도 요청 출고 (티오더 펌웨어·시리얼 작업, 건당 2,500원) ═══ */
+/* ═══ FW 설치 출고 (티오더 펌웨어·시리얼 작업, 건당 2,500원) ═══ */
 function specialReqRows() {
   let t = state.raw && state.raw.specialReqs;
   if(t && t._t === 'tbl') t = (t.rows || []).map(r => Object.fromEntries(t.cols.map((c, i) => [c, r[i]])));
@@ -2470,7 +2470,7 @@ function renderSpecial() {
     if(!open) return main;
     const ser = b.l.map(r => `<tr><td style="font-family:monospace;font-size:12.5px">${_escP(r.serial)}</td><td>${_spSt[r.status] || r.status}</td><td>${_spD(r.shipDate) || '-'}</td></tr>`).join('');
     return main + `<tr><td colspan="8" style="padding:0 16px 12px;background:var(--hover-bg,#fafbfc)"><div style="max-height:320px;overflow:auto"><table class="data"><thead><tr><th>시리얼번호</th><th>상태</th><th>출고일</th></tr></thead><tbody>${ser}</tbody></table></div></td></tr>`;
-  }).join('') || '<tr><td colspan="8"><div class="empty">별도 요청 건이 없습니다</div></td></tr>';
+  }).join('') || '<tr><td colspan="8"><div class="empty">FW 설치 요청 건이 없습니다</div></td></tr>';
 }
 async function exportSpecialExcel() {
   const rows = state.filteredSpecial || [];
@@ -2487,8 +2487,8 @@ async function exportSpecialExcel() {
   const ws = XLSX.utils.aoa_to_sheet(aoa);
   ws['!cols'] = [{wch:16},{wch:22},{wch:12},{wch:20},{wch:12},{wch:12},{wch:10},{wch:10}];
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, '별도 요청');
-  XLSX.writeFile(wb, `별도요청_출고_${new Date().toISOString().slice(0,10)}.xlsx`);
+  XLSX.utils.book_append_sheet(wb, ws, 'FW 설치 요청');
+  XLSX.writeFile(wb, `FW설치요청_출고_${new Date().toISOString().slice(0,10)}.xlsx`);
   toast('엑셀 파일로 내보냈습니다');
 }
 
