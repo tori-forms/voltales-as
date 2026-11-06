@@ -979,7 +979,7 @@ table.data tr:hover td{background:var(--hover-bg,#fafbfc)}
 
     <!-- ════════ Tab: 외부 작업 출고 (v2.82) ════════ -->
     <div class="tab-pane" id="pane-fwship" hidden>
-      <div class="grid-4" id="fwship-kpi"></div>
+      <div class="grid-4" id="fwship-kpi" style="grid-template-columns:repeat(2,1fr)"></div>
       <div class="card">
         <div class="card-title">외부 작업 출고 (펌웨어·시리얼 작업)</div>
         <div class="table-wrap">
@@ -2474,7 +2474,7 @@ function renderSpecial() {
     const bs = state.spB[tab] = _spBatches(rows);
     document.querySelectorAll(`[data-fwcnt="${tab}"]`).forEach(e => { e.textContent = rows.length ? fmt.num(rows.length) : ''; });
     document.getElementById(tab + '-kpi').innerHTML = ship
-      ? kpi('출고 대수', rows.length, '대') + kpi('묶음', bs.length, '건') + kpi('청구 금액', rows.reduce((s, r) => s + Number(r.price || 0), 0), '원')
+      ? kpi('출고 대수', rows.length, '대') + kpi('청구 금액', rows.reduce((s, r) => s + Number(r.price || 0), 0), '원')
       : kpi('작업 대기 대수', rows.length, '대') + kpi('작업 중', n('in'), '대') + kpi('출고대기', n('ready'), '대');   // v2.85: 묶음 카드 제외 (요청)
     const cols = ship ? 7 : 6;
     document.querySelector(`#${tab}-table tbody`).innerHTML = bs.map((b, i) => {
