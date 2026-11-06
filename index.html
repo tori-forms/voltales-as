@@ -970,7 +970,7 @@ table.data tr:hover td{background:var(--hover-bg,#fafbfc)}
         <div class="card-title">외부 작업 요청 (펌웨어·시리얼 작업)</div>
         <div class="table-wrap">
           <table class="data" id="fwreq-table">
-            <thead><tr><th>묶음</th><th>기종</th><th>작업</th><th>입고일</th><th style="text-align:right">대수</th><th>상태</th></tr></thead>
+            <thead><tr><th>요청일</th><th>기종</th><th>작업</th><th>입고일</th><th style="text-align:right">대수</th><th>상태</th></tr></thead>
             <tbody></tbody>
           </table>
         </div>
@@ -984,7 +984,7 @@ table.data tr:hover td{background:var(--hover-bg,#fafbfc)}
         <div class="card-title">외부 작업 출고 (펌웨어·시리얼 작업)</div>
         <div class="table-wrap">
           <table class="data" id="fwship-table">
-            <thead><tr><th>묶음</th><th>기종</th><th>작업</th><th>입고일</th><th>출고일</th><th style="text-align:right">대수</th><th style="text-align:right">금액</th></tr></thead>
+            <thead><tr><th>요청일</th><th>기종</th><th>작업</th><th>입고일</th><th>출고일</th><th style="text-align:right">대수</th><th style="text-align:right">금액</th></tr></thead>
             <tbody></tbody>
           </table>
         </div>
@@ -2499,7 +2499,7 @@ async function exportSpecialExcel(tab) {
   const aoa = [
     ['합계', `요청 ${rows.length}대 · 출고완료 ${done.length}대 / ${done.reduce((s, r) => s + Number(r.price || 0), 0).toLocaleString('ko-KR')}원`],
     [],
-    ['묶음','시리얼번호','기종','작업','입고일','출고일','상태','금액'],
+    ['요청일','시리얼번호','기종','작업','입고일','출고일','상태','금액'],
     ...rows.map(r => [r.batch || '', r.serial, _spM(r.model), r.work || '', _spD(r.inAt), _spD(r.shipDate), _spSt[r.status] || r.status, r.status === 'shipped' ? Number(r.price || 0) : 0]),
   ];
   const ws = XLSX.utils.aoa_to_sheet(aoa);
