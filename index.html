@@ -1004,12 +1004,8 @@ table.data tr:hover td{background:var(--hover-bg,#fafbfc)}
     <div class="tab-pane" id="pane-inspreq" hidden>
       <div class="grid-4" id="inspreq-kpi" style="grid-template-columns:repeat(4,1fr)"></div>
       <div class="card">
-        <div class="card-title" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-          <span>검사 결과 · 수리 승인</span>
-          <label style="margin-left:auto;font-size:12.5px;font-weight:500;color:var(--text-3)">승인 코드
-            <input id="ir-code" type="password" autocomplete="off" style="margin-left:6px;width:130px;padding:5px 8px;border:1px solid #d1d5db;border-radius:6px"></label>
-        </div>
-        <div style="font-size:12.5px;color:var(--text-3);margin:-4px 0 10px">검사가 끝난 기기의 검사 내역과 예상 수리 공임비입니다. 승인 코드를 넣고 [수리 승인] 또는 [수리 안 함]을 눌러 주세요. [내역서]로 엑셀 파일을 받을 수 있습니다.</div>
+        <div class="card-title">검사 결과 · 수리 승인</div>
+        <div style="font-size:12.5px;color:var(--text-3);margin:-4px 0 10px">검사가 끝난 기기의 검사 내역과 예상 수리 공임비입니다. [수리 승인] 또는 [수리 안 함]을 눌러 주세요. [내역서]로 엑셀 파일을 받을 수 있습니다.</div>
         <div class="table-wrap">
           <table class="data" id="inspreq-table">
             <thead><tr><th>검사일</th><th>기종</th><th>시리얼번호</th><th>수리 필요 항목</th><th style="text-align:right">예상 공임비</th><th>상태</th><th></th></tr></thead>
@@ -2538,7 +2534,7 @@ async function exportSpecialExcel(tab) {
   toast('엑셀 파일로 내보냈습니다');
 }
 
-/* ═══ 검사 결과 · 수리 승인 (v2.90) — 사내전산 검사요청 시트를 보여주고, 승인/거부는 승인 코드를 서버가 확인 ═══ */
+/* ═══ 검사 결과 · 수리 승인 (v2.91) — 사내전산 검사요청 시트를 보여주고, 승인/거부는 확인 팝업 후 서버로 (승인 대기 건만) ═══ */
 const IR_ITEMS = [['power','전원'], ['screen','화면'], ['touch','터치'], ['func','기타기능'], ['exterior','외관']];
 const IR_ST = { wait:['승인 대기','#d97706'], approved:['수리 승인','#2563eb'], declined:['수리 안 함','#6b7280'], converted:['수리 진행','#16a34a'] };
 const IR_LOCAL_KEY = 'ir_decided_v1';
@@ -2575,13 +2571,10 @@ function renderInspReq() {
 async function irDecide(i, decision) {
   const r = (state.irRows || [])[i];
   if(!r || r.status !== 'wait') return;
-  const codeEl = document.getElementById('ir-code'), code = (codeEl.value || '').trim();
-  if(!code) { toast('승인 코드를 먼저 입력해 주세요', 'error'); codeEl.focus(); return; }
-  const what = decision === 'approved' ? `수리 승인 (예상 공임비 ${fmt.num(Number(r.labor || 0))}원)` : '수리 안 함';
-  if(!confirm(`${r.serial}\n${what}으로 처리할까요?`)) return;
+  const what = decision === 'approved' ? `수리를 승인하시겠습니까?\n예상 공임비 ${fmt.num(Number(r.labor || 0))}원` : '수리하지 않고 검사만으로 마칠까요?';
+  if(!confirm(`${r.serial}\n\n${what}\n\n한 번 처리하면 되돌릴 수 없습니다.`)) return;
   try {
-    // POST 본문으로 보냄 — 승인 코드가 주소(URL)에 남지 않게
-    const res = await fetch(APPS_SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'clientInspDecide', id: r.id, decision, code }) });
+    const res = await fetch(APPS_SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'clientInspDecide', id: r.id, decision }) });
     const j = await res.json();
     const loc = _irLocal();
     if(j.ok) {
@@ -2589,8 +2582,7 @@ async function irDecide(i, decision) {
       toast(decision === 'approved' ? `${r.serial} 수리 승인했습니다` : `${r.serial} 수리 안 함으로 처리했습니다`);
     } else {
       if(j.error === 'not_wait' && j.status) { loc[r.id] = { status: j.status }; _irSaveLocal(loc); }
-      toast({ code: '승인 코드가 맞지 않습니다', locked: '코드를 여러 번 틀려 10분 동안 막혔습니다. 잠시 후 다시 시도해 주세요',
-        not_wait: '이미 처리된 건입니다', not_found: '검사 건을 찾지 못했습니다', 'busy-lock': '서버가 바쁩니다. 잠시 후 다시 눌러 주세요' }[j.error] || ('처리 실패: ' + j.error), 'error');
+      toast({ not_wait: '이미 처리된 건입니다', not_found: '검사 건을 찾지 못했습니다', 'busy-lock': '서버가 바쁩니다. 잠시 후 다시 눌러 주세요' }[j.error] || ('처리 실패: ' + j.error), 'error');
     }
     renderInspReq();
   } catch(e) { toast('서버 연결 실패. 잠시 후 다시 시도해 주세요', 'error'); }
